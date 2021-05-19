@@ -13,6 +13,7 @@ const (
 	AzureBlobFilesystemProvider                           // Azure Blob Storage
 	CryptedFilesystemProvider                             // Local encrypted
 	SFTPFilesystemProvider                                // SFTP
+	CLIFilesystemProvider                                 // Command Line Interface
 )
 
 // Filesystem defines cloud storage filesystem details
@@ -24,6 +25,7 @@ type Filesystem struct {
 	AzBlobConfig   AzBlobFsConfig     `json:"azblobconfig,omitempty"`
 	CryptConfig    CryptFsConfig      `json:"cryptconfig,omitempty"`
 	SFTPConfig     SFTPFsConfig       `json:"sftpconfig,omitempty"`
+	CLIConfig      CliFsConfig        `json:"cliconfig,omitempty"`
 }
 
 // SetEmptySecretsIfNil sets the secrets to empty if nil
@@ -88,6 +90,8 @@ func (f *Filesystem) IsEqual(other *Filesystem) bool {
 		return f.CryptConfig.isEqual(&other.CryptConfig)
 	case SFTPFilesystemProvider:
 		return f.SFTPConfig.isEqual(&other.SFTPConfig)
+	case CLIFilesystemProvider:
+		return f.CLIConfig.isEqual(&other.CLIConfig)
 	default:
 		return true
 	}
@@ -140,6 +144,9 @@ func (f *Filesystem) GetACopy() Filesystem {
 			Prefix:                  f.SFTPConfig.Prefix,
 			DisableCouncurrentReads: f.SFTPConfig.DisableCouncurrentReads,
 			BufferSize:              f.SFTPConfig.BufferSize,
+		},
+		CLIConfig: CliFsConfig{
+			BinPath: f.CLIConfig.BinPath,
 		},
 	}
 	if len(f.SFTPConfig.Fingerprints) > 0 {

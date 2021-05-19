@@ -89,6 +89,8 @@ func (v *BaseVirtualFolder) GetStorageDescrition() string {
 		return fmt.Sprintf("Encrypted: %v", v.MappedPath)
 	case SFTPFilesystemProvider:
 		return fmt.Sprintf("SFTP: %v", v.FsConfig.SFTPConfig.Endpoint)
+	case CLIFilesystemProvider:
+		return fmt.Sprintf("CLI: %v", v.FsConfig.CLIConfig.BinPath)
 	default:
 		return ""
 	}
@@ -184,6 +186,8 @@ func (v *VirtualFolder) GetFilesystem(connectionID string, forbiddenSelfUsers []
 		return NewCryptFs(connectionID, v.MappedPath, v.VirtualPath, v.FsConfig.CryptConfig)
 	case SFTPFilesystemProvider:
 		return NewSFTPFs(connectionID, v.VirtualPath, v.MappedPath, forbiddenSelfUsers, v.FsConfig.SFTPConfig)
+	case CLIFilesystemProvider:
+		return NewCLIFs(connectionID, v.VirtualPath, v.MappedPath, v.FsConfig.CLIConfig)
 	default:
 		return NewOsFs(connectionID, v.MappedPath, v.VirtualPath), nil
 	}

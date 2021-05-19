@@ -35,6 +35,7 @@ require (
 	github.com/otiai10/copy v1.6.0
 	github.com/pelletier/go-toml v1.9.1 // indirect
 	github.com/pires/go-proxyproto v0.5.0
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkg/sftp v1.13.0
 	github.com/prometheus/client_golang v1.10.0
 	github.com/prometheus/common v0.24.0 // indirect
