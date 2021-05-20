@@ -724,6 +724,13 @@ func getSFTPConfig(r *http.Request) (vfs.SFTPFsConfig, error) {
 	return config, err
 }
 
+func getCLIConfig(r *http.Request) (vfs.CliFsConfig, error) {
+	var err error
+	config := vfs.CliFsConfig{}
+	config.BinPath = r.Form.Get("bin_path")
+	return config, err
+}
+
 func getAzureConfig(r *http.Request) (vfs.AzBlobFsConfig, error) {
 	var err error
 	config := vfs.AzBlobFsConfig{}
@@ -777,6 +784,12 @@ func getFsConfigFromPostFields(r *http.Request) (vfs.Filesystem, error) {
 			return fs, err
 		}
 		fs.SFTPConfig = config
+	case vfs.CLIFilesystemProvider:
+		config, err := getCLIConfig(r)
+		if err != nil {
+			return fs, err
+		}
+		fs.CLIConfig = config
 	}
 	return fs, nil
 }
@@ -827,6 +840,8 @@ func getFolderFromTemplate(folder vfs.BaseVirtualFolder, name string) vfs.BaseVi
 		folder.FsConfig.AzBlobConfig = getAzBlobFsFromTemplate(folder.FsConfig.AzBlobConfig, replacements)
 	case vfs.SFTPFilesystemProvider:
 		folder.FsConfig.SFTPConfig = getSFTPFsFromTemplate(folder.FsConfig.SFTPConfig, replacements)
+	case vfs.CLIFilesystemProvider:
+		folder.FsConfig.CLIConfig = getCLIFsFromTemplate(folder.FsConfig.CLIConfig, replacements)
 	}
 
 	return folder
@@ -877,6 +892,11 @@ func getSFTPFsFromTemplate(fsConfig vfs.SFTPFsConfig, replacements map[string]st
 	return fsConfig
 }
 
+func getCLIFsFromTemplate(fsConfig vfs.CliFsConfig, replacements map[string]string) vfs.CliFsConfig {
+	fsConfig.BinPath = replacePlaceholders(fsConfig.BinPath, replacements)
+	return fsConfig
+}
+
 func getUserFromTemplate(user dataprovider.User, template userTemplateFields) dataprovider.User {
 	user.Username = template.Username
 	user.Password = template.Password
@@ -911,6 +931,8 @@ func getUserFromTemplate(user dataprovider.User, template userTemplateFields) da
 		user.FsConfig.AzBlobConfig = getAzBlobFsFromTemplate(user.FsConfig.AzBlobConfig, replacements)
 	case vfs.SFTPFilesystemProvider:
 		user.FsConfig.SFTPConfig = getSFTPFsFromTemplate(user.FsConfig.SFTPConfig, replacements)
+	case vfs.CLIFilesystemProvider:
+		user.FsConfig.CLIConfig = getCLIFsFromTemplate(user.FsConfig.CLIConfig, replacements)
 	}
 
 	return user
