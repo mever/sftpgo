@@ -1478,6 +1478,7 @@ func validateFilesystemConfig(fsConfig *vfs.Filesystem, helper fsValidatorHelper
 		fsConfig.AzBlobConfig = vfs.AzBlobFsConfig{}
 		fsConfig.CryptConfig = vfs.CryptFsConfig{}
 		fsConfig.SFTPConfig = vfs.SFTPFsConfig{}
+		fsConfig.CLIConfig = vfs.CliFsConfig{}
 		return nil
 	} else if fsConfig.Provider == vfs.GCSFilesystemProvider {
 		if err := fsConfig.GCSConfig.Validate(helper.GetGCSCredentialsFilePath()); err != nil {
@@ -1487,6 +1488,7 @@ func validateFilesystemConfig(fsConfig *vfs.Filesystem, helper fsValidatorHelper
 		fsConfig.AzBlobConfig = vfs.AzBlobFsConfig{}
 		fsConfig.CryptConfig = vfs.CryptFsConfig{}
 		fsConfig.SFTPConfig = vfs.SFTPFsConfig{}
+		fsConfig.CLIConfig = vfs.CliFsConfig{}
 		return nil
 	} else if fsConfig.Provider == vfs.AzureBlobFilesystemProvider {
 		if err := fsConfig.AzBlobConfig.Validate(); err != nil {
@@ -1499,6 +1501,7 @@ func validateFilesystemConfig(fsConfig *vfs.Filesystem, helper fsValidatorHelper
 		fsConfig.GCSConfig = vfs.GCSFsConfig{}
 		fsConfig.CryptConfig = vfs.CryptFsConfig{}
 		fsConfig.SFTPConfig = vfs.SFTPFsConfig{}
+		fsConfig.CLIConfig = vfs.CliFsConfig{}
 		return nil
 	} else if fsConfig.Provider == vfs.CryptedFilesystemProvider {
 		if err := fsConfig.CryptConfig.Validate(); err != nil {
@@ -1511,6 +1514,7 @@ func validateFilesystemConfig(fsConfig *vfs.Filesystem, helper fsValidatorHelper
 		fsConfig.GCSConfig = vfs.GCSFsConfig{}
 		fsConfig.AzBlobConfig = vfs.AzBlobFsConfig{}
 		fsConfig.SFTPConfig = vfs.SFTPFsConfig{}
+		fsConfig.CLIConfig = vfs.CliFsConfig{}
 		return nil
 	} else if fsConfig.Provider == vfs.SFTPFilesystemProvider {
 		if err := fsConfig.SFTPConfig.Validate(); err != nil {
@@ -1523,6 +1527,17 @@ func validateFilesystemConfig(fsConfig *vfs.Filesystem, helper fsValidatorHelper
 		fsConfig.GCSConfig = vfs.GCSFsConfig{}
 		fsConfig.AzBlobConfig = vfs.AzBlobFsConfig{}
 		fsConfig.CryptConfig = vfs.CryptFsConfig{}
+		fsConfig.CLIConfig = vfs.CliFsConfig{}
+		return nil
+	} else if fsConfig.Provider == vfs.CLIFilesystemProvider {
+		if err := fsConfig.CLIConfig.Validate(); err != nil {
+			return &ValidationError{err: fmt.Sprintf("could not validate CLI fs config: %v", err)}
+		}
+		fsConfig.S3Config = vfs.S3FsConfig{}
+		fsConfig.GCSConfig = vfs.GCSFsConfig{}
+		fsConfig.AzBlobConfig = vfs.AzBlobFsConfig{}
+		fsConfig.CryptConfig = vfs.CryptFsConfig{}
+		fsConfig.SFTPConfig = vfs.SFTPFsConfig{}
 		return nil
 	}
 	fsConfig.Provider = vfs.LocalFilesystemProvider
@@ -1531,6 +1546,7 @@ func validateFilesystemConfig(fsConfig *vfs.Filesystem, helper fsValidatorHelper
 	fsConfig.AzBlobConfig = vfs.AzBlobFsConfig{}
 	fsConfig.CryptConfig = vfs.CryptFsConfig{}
 	fsConfig.SFTPConfig = vfs.SFTPFsConfig{}
+	fsConfig.CLIConfig = vfs.CliFsConfig{}
 	return nil
 }
 

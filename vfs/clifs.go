@@ -35,6 +35,11 @@ func (c *CliFsConfig) isEqual(other *CliFsConfig) bool {
 	return c.BinPath == other.BinPath
 }
 
+// Validate returns an error if the configuration is not valid
+func (c *CliFsConfig) Validate() error {
+	return nil
+}
+
 type CliFs struct {
 	name         string
 	connectionID string
