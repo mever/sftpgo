@@ -92,7 +92,7 @@ func (fs *CliFs) Lstat(name string) (os.FileInfo, error) {
 // Open opens the named file for reading
 func (fs *CliFs) Open(name string, offset int64) (File, *pipeat.PipeReaderAt, func(), error) {
 	ctx, cancelFn := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, name, strconv.Itoa(int(offset)))
+	cmd := exec.CommandContext(ctx, fs.config.BinPath, name, strconv.Itoa(int(offset)))
 	stdout, er := cmd.StdoutPipe()
 	if er != nil {
 		cancelFn()
@@ -143,7 +143,7 @@ func (fs *CliFs) Create(name string, flag int) (File, *PipeWriter, func(), error
 	}
 	p := NewPipeWriter(w)
 	ctx, cancelFn := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, name, strconv.Itoa(flag))
+	cmd := exec.CommandContext(ctx, fs.config.BinPath, name, strconv.Itoa(flag))
 	cmd.Stdin = r
 	if er := cmd.Start(); er != nil {
 		cancelFn()
@@ -386,7 +386,7 @@ func (*CliFs) GetAvailableDiskSize(dirName string) (*sftp.StatVFS, error) {
 }
 
 func (fs CliFs) callMap(name string, args ...string) (map[string]interface{}, error) {
-	cmd := exec.Command(name, args...)
+	cmd := exec.Command(fs.config.BinPath, append([]string{name}, args...)...)
 	b, er := cmd.Output()
 	if er != nil {
 		return nil, errors.Wrap(er, "failed to run command: " + fs.config.BinPath + " " + strings.Join(args, " "))
@@ -412,8 +412,9 @@ func newFileInfoFromMap(m map[string]interface{}) (fi *FileInfo, er error) {
 			}
 		}
 	}()
+	t, _ := time.Parse(time.RFC3339, m["modTime"].(string))
 	fi = NewFileInfo(m["name"].(string), m["isDirectory"].(bool),
-		m["sizeInBytes"].(int64), m["modTime"].(time.Time), m["fullName"].(bool))
+		int64(m["sizeInBytes"].(float64)), t, m["fullName"].(bool))
 
 	return
 }
