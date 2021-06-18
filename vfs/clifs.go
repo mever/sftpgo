@@ -29,10 +29,13 @@ type CliFsConfig struct {
 
 	// BinPath is the path to a binary that will receive filesystem operations.
 	BinPath string
+
+	// ExtraCommandArgs is a JSON array of strings of extra command-line arguments for the CLI program that are added before the file system operation name.
+	ExtraCommandArgs string
 }
 
 func (c *CliFsConfig) isEqual(other *CliFsConfig) bool {
-	return c.BinPath == other.BinPath
+	return c.BinPath == other.BinPath && c.ExtraCommandArgs == other.ExtraCommandArgs
 }
 
 // Validate returns an error if the configuration is not valid
@@ -71,7 +74,7 @@ func (fs *CliFs) ConnectionID() string {
 
 // Stat returns a FileInfo describing the named file
 func (fs *CliFs) Stat(name string) (os.FileInfo, error) {
-	m, er := fs.callMap("stat", name)
+	m, er := fs.callMustMap("stat", name)
 	if er != nil {
 		return nil, errors.Wrap(er, "calling command failed")
 	}
@@ -79,11 +82,15 @@ func (fs *CliFs) Stat(name string) (os.FileInfo, error) {
 	return newFileInfoFromMap(m)
 }
 
-// Lstat returns a FileInfo describing the named file
+// Lstat returns a FileInfo describing the named file, or nil if there is no such file.
 func (fs *CliFs) Lstat(name string) (os.FileInfo, error) {
-	m, er := fs.callMap("lstat", name)
+	m, er := fs.callCanMap("lstat", name)
 	if er != nil {
 		return nil, errors.Wrap(er, "calling command failed")
+	}
+
+	if m == nil {
+		return nil, newNotExistsError("file or directory does not exist: " + name)
 	}
 
 	return newFileInfoFromMap(m)
@@ -143,7 +150,7 @@ func (fs *CliFs) Create(name string, flag int) (File, *PipeWriter, func(), error
 	}
 	p := NewPipeWriter(w)
 	ctx, cancelFn := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, fs.config.BinPath, name, strconv.Itoa(flag))
+	cmd := exec.CommandContext(ctx, fs.config.BinPath, "create", name, strconv.Itoa(flag))
 	cmd.Stdin = r
 	if er := cmd.Start(); er != nil {
 		cancelFn()
@@ -203,7 +210,7 @@ func (*CliFs) Truncate(name string, size int64) error {
 
 // Rename renames (moves) source to target
 func (fs *CliFs) Rename(source, target string) error {
-	m, er := fs.callMap("remove", source, target)
+	m, er := fs.callMustMap("remove", source, target)
 	if er != nil {
 		return errors.Wrap(er, "calling command failed")
 	}
@@ -216,7 +223,7 @@ func (fs *CliFs) Remove(name string, isDir bool) error {
 	if isDir {
 		isDirStr = "1"
 	}
-	m, er := fs.callMap("remove", name, isDirStr)
+	m, er := fs.callMustMap("remove", name, isDirStr)
 	if er != nil {
 		return errors.Wrap(er, "calling command failed")
 	}
@@ -231,7 +238,7 @@ func (*CliFs) Mkdir(name string) error {
 // ReadDir reads the directory named by dirname and returns
 // a list of directory entries.
 func (fs *CliFs) ReadDir(dirname string) ([]os.FileInfo, error) {
-	m, er := fs.callMap("readDir", dirname)
+	m, er := fs.callMustMap("readDir", dirname)
 	if er != nil {
 		return nil, errors.Wrap(er, "calling command failed")
 	}
@@ -272,7 +279,8 @@ func (*CliFs) IsAtomicUploadSupported() bool {
 // IsNotExist returns a boolean indicating whether the error is known to
 // report that a file or directory does not exist
 func (*CliFs) IsNotExist(err error) bool {
-	return false
+	_, ok := err.(notExistsError)
+	return ok
 }
 
 // IsPermission returns a boolean indicating whether the error is known to
@@ -360,7 +368,7 @@ func (*CliFs) HasVirtualFolders() bool {
 
 // GetMimeType returns the content type
 func (fs *CliFs) GetMimeType(name string) (string, error) {
-	m, er := fs.callMap("getMimeType", name)
+	m, er := fs.callMustMap("getMimeType", name)
 	if er != nil {
 		return "", errors.Wrap(er, "calling command failed")
 	}
@@ -385,19 +393,54 @@ func (*CliFs) GetAvailableDiskSize(dirName string) (*sftp.StatVFS, error) {
 	return nil, ErrStorageSizeUnavailable
 }
 
-func (fs CliFs) callMap(name string, args ...string) (map[string]interface{}, error) {
-	cmd := exec.Command(fs.config.BinPath, append([]string{name}, args...)...)
-	b, er := cmd.Output()
-	if er != nil {
-		return nil, errors.Wrap(er, "failed to run command: " + fs.config.BinPath + " " + strings.Join(args, " "))
+// callMustMap executes a call on the fs and always returns a map on success.
+func (fs CliFs) callMustMap(name string, args ...string) (map[string]interface{}, error) {
+	b, err := fs.call(name, args...)
+	if err != nil {
+		return nil, err
 	}
 
+	return toMap(b)
+}
+
+// callCanMap executes a call on the fs and can optionally return a map or nil.
+func (fs CliFs) callCanMap(name string, args ...string) (map[string]interface{}, error) {
+	b, err := fs.call(name, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(b) == 0 {
+		return nil, nil
+	}
+
+	return toMap(b)
+}
+
+func toMap(b []byte) (map[string]interface{}, error) {
 	m := make(map[string]interface{})
-	if er = json.Unmarshal(b, &m); er != nil {
-		return nil, errors.Wrap(er, "failed to decode JSON")
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, errors.Wrap(err, "failed to decode JSON")
 	}
 
 	return m, nil
+}
+
+func (fs CliFs) call(name string, args ...string) ([]byte, error) {
+	var flags []string
+	if er := json.Unmarshal([]byte(fs.config.ExtraCommandArgs), &flags); er != nil {
+		return nil, errors.Wrap(er, "failed to decode extra command flags")
+	}
+
+	a := append(flags, name)
+	a = append(a, args...)
+	cmd := exec.Command(fs.config.BinPath, a...)
+	b, er := cmd.Output()
+	if er != nil {
+		return nil, errors.Wrap(er, "failed to run command: " + fs.config.BinPath + " " + strings.Join(a, " "))
+	}
+
+	return b, nil
 }
 
 func newFileInfoFromMap(m map[string]interface{}) (fi *FileInfo, er error) {
@@ -455,4 +498,19 @@ func newStatusFromMap(m map[string]interface{}) *Status {
 		}
 	}
 	return nil
+}
+
+// notExistsError is used when trying to access a file that does not exist.
+type notExistsError struct {
+	internalError error
+}
+
+func newNotExistsError(msg string) notExistsError {
+	return notExistsError{
+		internalError: errors.New(msg),
+	}
+}
+
+func (e notExistsError) Error() string {
+	return e.internalError.Error()
 }

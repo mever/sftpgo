@@ -246,6 +246,15 @@
                placeholder="/usr/bin/fs_command"
                maxlength="1000">
     </div>
+    <label for="idCLIExtraCommandArgs" class="col-sm-2 col-form-label">Extra command arguments</label>
+    <div class="col-sm-10">
+        <textarea class="form-control" id="idCLIExtraCommandArgs" name="extra_command_flags" rows="3"
+                  aria-describedby="extraCommandFlagsHelpBlock">{{.CLIConfig.ExtraCommandArgs}}</textarea>
+        <small id="extraCommandFlagsHelpBlock" class="form-text text-muted">
+            JSON array of strings of extra command-line arguments for the CLI program that are added before the file system operation name.
+        </small>
+    </div>
+
 </div>
 
 <div class="form-group row sftp">

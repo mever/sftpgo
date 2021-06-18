@@ -728,6 +728,7 @@ func getCLIConfig(r *http.Request) (vfs.CliFsConfig, error) {
 	var err error
 	config := vfs.CliFsConfig{}
 	config.BinPath = r.Form.Get("bin_path")
+	config.ExtraCommandArgs = r.Form.Get("extra_command_args")
 	return config, err
 }
 
