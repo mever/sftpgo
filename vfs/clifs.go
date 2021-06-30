@@ -202,11 +202,11 @@ func (*CliFs) Truncate(name string, size int64) error {
 
 // Rename renames (moves) source to target
 func (fs *CliFs) Rename(source, target string) error {
-	m, er := fs.callMustMap("remove", source, target)
+	m, er := fs.callMustMap("rename", source, target)
 	if er != nil {
 		return errors.Wrap(er, "calling command failed")
 	}
-	return newStatusFromMap(m)
+	return getErrorFromStatus(m)
 }
 
 // Remove removes the named file or (empty) directory.
@@ -219,7 +219,7 @@ func (fs *CliFs) Remove(name string, isDir bool) error {
 	if er != nil {
 		return errors.Wrap(er, "calling command failed")
 	}
-	return newStatusFromMap(m)
+	return getErrorFromStatus(m)
 }
 
 // Mkdir creates a new directory with the specified name and default permissions
@@ -278,7 +278,8 @@ func (*CliFs) IsNotExist(err error) bool {
 // IsPermission returns a boolean indicating whether the error is known to
 // report that permission is denied.
 func (*CliFs) IsPermission(err error) bool {
-	return false
+	_, ok := err.(permissionDeniedError)
+	return ok
 }
 
 // IsNotSupported returns true if the error indicate an unsupported operation
@@ -464,32 +465,44 @@ const (
 type Status struct {
 	Type int
 	Message string
+	FsOpError int
 }
 
 func (s Status) Error() string {
 	return s.Message
 }
 
-func newStatusFromMap(m map[string]interface{}) *Status {
-	if data, has := m["status"]; has {
-		if statusData, ok := data.(map[string]interface{}); ok {
-			status := &Status{Type: StatusTypeUnknown}
-			if t, ok := statusData["type"].(int); ok {
-				status.Type = t
-			}
-			if msg, ok := statusData["message"].(string); ok {
-				status.Message = msg
-			}
-			if status.Type > 1 {
-				return status
-			} else {
-				return nil
-			}
-		} else {
-			return &Status{Type: StatusTypeError, Message: "expected 'status' field to contain status data"}
-		}
+func getErrorFromStatus(m map[string]interface{}) error {
+	status := &Status{Type: StatusTypeUnknown, FsOpError: 0}
+	if t, ok := m["type"].(float64); ok {
+		status.Type = int(t)
 	}
-	return nil
+	if msg, ok := m["message"].(string); ok {
+		status.Message = msg
+	}
+	if status.Type > 1 {
+		if ctx, has := m["context"]; has {
+			if contextData, ok := ctx.(map[string]interface{}); ok {
+				if foe, ok := contextData["fs_op_error"].(float64); ok {
+					status.FsOpError = int(foe)
+				}
+			}
+		}
+
+		switch status.FsOpError {
+		case 1:
+			return newNotExistsError(status.Message)
+
+		case 2:
+			return newPermissionDeniedError(status.Message)
+
+		default:
+			return errors.Errorf("%s", status.Message)
+		}
+
+	} else {
+		return nil
+	}
 }
 
 // notExistsError is used when trying to access a file that does not exist.
@@ -504,5 +517,20 @@ func newNotExistsError(msg string) notExistsError {
 }
 
 func (e notExistsError) Error() string {
+	return e.internalError.Error()
+}
+
+// permissionDeniedError is used when trying to access a file without the permission to it.
+type permissionDeniedError struct {
+	internalError error
+}
+
+func newPermissionDeniedError(msg string) permissionDeniedError {
+	return permissionDeniedError{
+		internalError: errors.New(msg),
+	}
+}
+
+func (e permissionDeniedError) Error() string {
 	return e.internalError.Error()
 }
