@@ -10,7 +10,6 @@ import (
 	"github.com/eikenb/pipeat"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
-	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -98,48 +97,41 @@ func (fs *CliFs) Lstat(name string) (os.FileInfo, error) {
 
 // Open opens the named file for reading
 func (fs *CliFs) Open(name string, offset int64) (File, *pipeat.PipeReaderAt, func(), error) {
-	ctx, cancelFn := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, fs.config.BinPath, name, strconv.Itoa(int(offset)))
-	stdout, er := cmd.StdoutPipe()
-	if er != nil {
-		cancelFn()
-		return nil, nil, nil, errors.Wrap(er, "could not open stdout pipe to command process")
+	var args []string
+	if er := json.Unmarshal([]byte(fs.config.ExtraCommandArgs), &args); er != nil {
+		return nil, nil, nil, errors.Wrap(er, "failed to decode extra command args")
 	}
-	if er := cmd.Start(); er != nil {
-		cancelFn()
-		_ = stdout.Close()
-		return nil, nil, nil, errors.Wrap(er, "failed to start command process")
-	}
-
-	// Assume command's output is prefixed with JSON data about the file, the rest of the data is file content.
-	fileMetaData := make(map[string]interface{})
-	d := json.NewDecoder(stdout)
-	if err := d.Decode(&fileMetaData); err != nil {
-		cancelFn()
-		_ = stdout.Close()
-		return nil, nil, nil, errors.Wrap(err, "could not decode file metadata as JSON")
-	}
+	a := append(args, "open")
+	a = append(a, name)
+	a = append(a, strconv.Itoa(int(offset)))
 
 	r, w, er := pipeat.PipeInDir(fs.localTempDir)
 	if er != nil {
-		cancelFn()
-		_ = stdout.Close()
 		return nil, nil, nil, errors.Wrap(er, "failed to create pipeat")
+	}
+
+	ctx, cancelFn := context.WithCancel(context.Background())
+
+	cmd := exec.CommandContext(ctx, fs.config.BinPath, a...)
+	cmd.Stdout = w
+	if er2 := cmd.Start(); er2 != nil {
+		cancelFn()
+		_ = w.Close()
+		return nil, nil, nil, errors.Wrap(er2, "failed to start command process")
 	}
 
 	go func() {
 		defer func() {
 			cancelFn()
-			_ = stdout.Close()
-			_ = w.Close()
 		}()
-		n, err := io.Copy(w, io.MultiReader(d.Buffered(), stdout))
+		err := errors.Wrap(cmd.Wait(), "wait failure")
+		n := w.GetWrittenBytes()
 		_ = w.CloseWithError(errors.Wrap(err, "failed to copy"))
 		fsLog(fs, logger.LevelDebug, "download completed, path: %#v size: %v, err: %v", name, n, err)
-		metrics.GCSTransferCompleted(n, 1, err)
+		metrics.TransferCompleted(n,0, 1, err)
 	}()
 
-	return nil, r, cancelFn, errors.Wrap(cmd.Wait(), "wait failed")
+	return nil, r, cancelFn, nil
 }
 
 // Create creates or opens the named file for writing
