@@ -136,13 +136,22 @@ func (fs *CliFs) Open(name string, offset int64) (File, *pipeat.PipeReaderAt, fu
 
 // Create creates or opens the named file for writing
 func (fs *CliFs) Create(name string, flag int) (File, *PipeWriter, func(), error) {
+	var args []string
+	if er := json.Unmarshal([]byte(fs.config.ExtraCommandArgs), &args); er != nil {
+		return nil, nil, nil, errors.Wrap(er, "failed to decode extra command args")
+	}
+	a := append(args, "create")
+	a = append(a, name)
+	a = append(a, strconv.Itoa(flag))
+
 	r, w, err := pipeat.PipeInDir(fs.localTempDir)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	p := NewPipeWriter(w)
 	ctx, cancelFn := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, fs.config.BinPath, "create", name, strconv.Itoa(flag))
+
+	cmd := exec.CommandContext(ctx, fs.config.BinPath, a...)
 	cmd.Stdin = r
 	if er := cmd.Start(); er != nil {
 		cancelFn()
