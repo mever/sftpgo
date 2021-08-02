@@ -3,6 +3,7 @@
 package vfs
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"github.com/drakkan/sftpgo/logger"
@@ -152,6 +153,9 @@ func (fs *CliFs) Create(name string, flag int) (File, *PipeWriter, func(), error
 	ctx, cancelFn := context.WithCancel(context.Background())
 
 	cmd := exec.CommandContext(ctx, fs.config.BinPath, a...)
+
+	stdErrBuf := bytes.Buffer{}
+	cmd.Stderr = &stdErrBuf
 	cmd.Stdin = r
 	if er := cmd.Start(); er != nil {
 		cancelFn()
@@ -161,12 +165,23 @@ func (fs *CliFs) Create(name string, flag int) (File, *PipeWriter, func(), error
 	}
 	go func() {
 		defer cancelFn()
-		err = errors.Wrap(cmd.Wait(), "wait failure")
+		var er3 error
+		errWait := cmd.Wait()
+		if errWait != nil {
+			m, er := toMap(stdErrBuf.Bytes())
+			if er == nil {
+				er3 = getErrorFromStatus(m)
+			}
+		}
+		if er3 == nil {
+			er3 = errors.Wrap(errWait, "wait failure")
+		}
 		n := r.GetReadedBytes()
-		r.CloseWithError(err) //nolint:errcheck
-		p.Done(err)
-		fsLog(fs, logger.LevelDebug, "upload completed, path: %#v, readed bytes: %v, err: %v", name, n, err)
-		metrics.GCSTransferCompleted(n, 0, err)
+		_ = r.CloseWithError(er3)
+		p.Done(er3)
+
+		fsLog(fs, logger.LevelDebug, "upload completed, path: %#v, readed bytes: %v, err: %v", name, n, er3)
+		metrics.GCSTransferCompleted(n, 0, er3)
 	}()
 	return nil, p, cancelFn, nil
 }
@@ -241,7 +256,7 @@ func (*CliFs) Mkdir(name string) error {
 func (fs *CliFs) ReadDir(dirname string) ([]os.FileInfo, error) {
 	m, er := fs.callMustMap("readDir", dirname)
 	if er != nil {
-		return nil, errors.Wrap(er, "calling command failed")
+		return nil, er
 	}
 
 	if res, has := m["list"]; has {
@@ -437,12 +452,22 @@ func (fs CliFs) call(name string, args ...string) ([]byte, error) {
 	a := append(flags, name)
 	a = append(a, args...)
 	cmd := exec.Command(fs.config.BinPath, a...)
-	b, er := cmd.Output()
-	if er != nil {
-		return nil, errors.Wrap(er, "failed to run command: " + fs.config.BinPath + " " + strings.Join(a, " "))
+
+	stdErrBuf := bytes.Buffer{}
+	var stdoutBuf bytes.Buffer
+	cmd.Stderr = &stdErrBuf
+	cmd.Stdout = &stdoutBuf
+
+	erRun := cmd.Run()
+	if erRun != nil {
+		m, erMap := toMap(stdErrBuf.Bytes())
+		if erMap == nil {
+			return nil, getErrorFromStatus(m)
+		}
+		return nil, errors.Wrap(erRun, "failed to run command: " + fs.config.BinPath + " " + strings.Join(a, " "))
 	}
 
-	return b, nil
+	return stdoutBuf.Bytes(), nil
 }
 
 func newFileInfoFromMap(m map[string]interface{}) (fi *FileInfo, er error) {
@@ -477,10 +502,6 @@ type Status struct {
 	FsOpError int
 }
 
-func (s Status) Error() string {
-	return s.Message
-}
-
 func getErrorFromStatus(m map[string]interface{}) error {
 	status := &Status{Type: StatusTypeUnknown, FsOpError: 0}
 	if t, ok := m["type"].(float64); ok {
@@ -506,7 +527,7 @@ func getErrorFromStatus(m map[string]interface{}) error {
 			return newPermissionDeniedError(status.Message)
 
 		default:
-			return errors.Errorf("%s", status.Message)
+			return Feedback(status.Message)
 		}
 
 	} else {

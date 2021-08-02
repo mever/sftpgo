@@ -1080,6 +1080,8 @@ func (c *BaseConnection) GetFsError(fs vfs.Fs, err error) error {
 		return c.GetPermissionDeniedError()
 	} else if fs.IsNotSupported(err) {
 		return c.GetOpUnsupportedError()
+	} else if _, ok := err.(vfs.Feedback); ok {
+		return err
 	} else if err != nil {
 		return c.GetGenericError(err)
 	}

@@ -99,6 +99,13 @@ type File interface {
 	Truncate(size int64) error
 }
 
+// Feedback defines an error that can give a feedback message
+type Feedback string
+
+func (f Feedback) Error() string {
+	return string(f)
+}
+
 // QuotaCheckResult defines the result for a quota check
 type QuotaCheckResult struct {
 	HasSpace     bool
