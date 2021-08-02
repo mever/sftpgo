@@ -6,11 +6,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/drakkan/sftpgo/logger"
-	"github.com/drakkan/sftpgo/metrics"
-	"github.com/eikenb/pipeat"
-	"github.com/pkg/errors"
-	"github.com/pkg/sftp"
 	"os"
 	"os/exec"
 	"path"
@@ -18,6 +13,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/drakkan/sftpgo/logger"
+	"github.com/drakkan/sftpgo/metrics"
+	"github.com/eikenb/pipeat"
+	"github.com/pkg/errors"
+	"github.com/pkg/sftp"
 )
 
 const (
@@ -48,17 +49,17 @@ type CliFs struct {
 	connectionID string
 	localTempDir string
 	// if not empty this fs is mouted as virtual folder in the specified path
-	mountPath      string
-	config *CliFsConfig
+	mountPath string
+	config    *CliFsConfig
 }
 
 func NewCLIFs(connectionID string, mountPath, localTempDir string, config CliFsConfig) (*CliFs, error) {
 	return &CliFs{
-		name: cliFsName,
+		name:         cliFsName,
 		connectionID: connectionID,
-		mountPath: mountPath,
+		mountPath:    mountPath,
 		localTempDir: localTempDir,
-		config: &config,
+		config:       &config,
 	}, nil
 }
 
@@ -129,7 +130,7 @@ func (fs *CliFs) Open(name string, offset int64) (File, *pipeat.PipeReaderAt, fu
 		n := w.GetWrittenBytes()
 		_ = w.CloseWithError(errors.Wrap(err, "failed to copy"))
 		fsLog(fs, logger.LevelDebug, "download completed, path: %#v size: %v, err: %v", name, n, err)
-		metrics.TransferCompleted(n,0, 1, err)
+		metrics.TransferCompleted(n, 0, 1, err)
 	}()
 
 	return nil, r, cancelFn, nil
@@ -168,10 +169,7 @@ func (fs *CliFs) Create(name string, flag int) (File, *PipeWriter, func(), error
 		var er3 error
 		errWait := cmd.Wait()
 		if errWait != nil {
-			m, er := toMap(stdErrBuf.Bytes())
-			if er == nil {
-				er3 = getErrorFromStatus(m)
-			}
+			er3 = getErrorFromStatus(stdErrBuf.Bytes())
 		}
 		if er3 == nil {
 			er3 = errors.Wrap(errWait, "wait failure")
@@ -185,7 +183,6 @@ func (fs *CliFs) Create(name string, flag int) (File, *PipeWriter, func(), error
 	}()
 	return nil, p, cancelFn, nil
 }
-
 
 // MkdirAll does nothing, we don't have folder
 func (*CliFs) MkdirAll(name string, uid int, gid int) error {
@@ -226,11 +223,8 @@ func (*CliFs) Truncate(name string, size int64) error {
 
 // Rename renames (moves) source to target
 func (fs *CliFs) Rename(source, target string) error {
-	m, er := fs.callMustMap("rename", source, target)
-	if er != nil {
-		return errors.Wrap(er, "calling command failed")
-	}
-	return getErrorFromStatus(m)
+	_, er := fs.call("rename", source, target)
+	return er
 }
 
 // Remove removes the named file or (empty) directory.
@@ -239,11 +233,8 @@ func (fs *CliFs) Remove(name string, isDir bool) error {
 	if isDir {
 		isDirStr = "1"
 	}
-	m, er := fs.callMustMap("remove", name, isDirStr)
-	if er != nil {
-		return errors.Wrap(er, "calling command failed")
-	}
-	return getErrorFromStatus(m)
+	_, er := fs.call("remove", name, isDirStr)
+	return er
 }
 
 // Mkdir creates a new directory with the specified name and default permissions
@@ -460,9 +451,8 @@ func (fs CliFs) call(name string, args ...string) ([]byte, error) {
 
 	erRun := cmd.Run()
 	if erRun != nil {
-		m, erMap := toMap(stdErrBuf.Bytes())
-		if erMap == nil {
-			return nil, getErrorFromStatus(m)
+		if s := getErrorFromStatus(stdErrBuf.Bytes()); s != nil {
+			return nil, s
 		}
 		return nil, errors.Wrap(erRun, "failed to run command: " + fs.config.BinPath + " " + strings.Join(a, " "))
 	}
@@ -496,40 +486,42 @@ const (
 	StatusTypeUnknown
 )
 
+const (
+	StatusCodeFeedback int = iota
+	StatusCodeNotExists
+	StatusCodePermissionDenied
+)
+
 type Status struct {
-	Type int
-	Message string
-	FsOpError int
+	Type    int    `json:"type"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
 }
 
-func getErrorFromStatus(m map[string]interface{}) error {
-	status := &Status{Type: StatusTypeUnknown, FsOpError: 0}
-	if t, ok := m["type"].(float64); ok {
-		status.Type = int(t)
+func getErrorFromStatus(b []byte) error {
+	if len(b) == 0 {
+		return nil
 	}
-	if msg, ok := m["message"].(string); ok {
-		status.Message = msg
+
+	s := Status{Type: StatusTypeUnknown}
+	if er := json.Unmarshal(b, &s); er != nil {
+		return er
 	}
-	if status.Type > 1 {
-		if ctx, has := m["context"]; has {
-			if contextData, ok := ctx.(map[string]interface{}); ok {
-				if foe, ok := contextData["fs_op_error"].(float64); ok {
-					status.FsOpError = int(foe)
-				}
-			}
-		}
 
-		switch status.FsOpError {
-		case 1:
-			return newNotExistsError(status.Message)
+	if s.Type == StatusTypeError {
+		switch s.Code {
+		case StatusCodeNotExists:
+			return newNotExistsError(s.Message)
 
-		case 2:
-			return newPermissionDeniedError(status.Message)
+		case StatusCodePermissionDenied:
+			return newPermissionDeniedError(s.Message)
 
 		default:
-			return Feedback(status.Message)
+			return Feedback(s.Message)
 		}
 
+	} else if s.Type == StatusTypeUnknown {
+		return errors.New("Unknown status error")
 	} else {
 		return nil
 	}
