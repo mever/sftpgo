@@ -77,7 +77,11 @@ func (fs *CliFs) ConnectionID() string {
 func (fs *CliFs) Stat(name string) (os.FileInfo, error) {
 	m, er := fs.callMustMap("stat", name)
 	if er != nil {
-		return nil, errors.Wrap(er, "calling command failed")
+		return nil, errors.Wrap(er, "calling stat command failed")
+	}
+
+	if m == nil {
+		return nil, newNotExistsError("file or directory does not exist: " + name)
 	}
 
 	return newFileInfoFromMap(m)
@@ -87,7 +91,7 @@ func (fs *CliFs) Stat(name string) (os.FileInfo, error) {
 func (fs *CliFs) Lstat(name string) (os.FileInfo, error) {
 	m, er := fs.callCanMap("lstat", name)
 	if er != nil {
-		return nil, errors.Wrap(er, "calling command failed")
+		return nil, errors.Wrap(er, "calling lstat command failed")
 	}
 
 	if m == nil {
