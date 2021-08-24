@@ -334,7 +334,7 @@ func TestOrderDirsToRemove(t *testing.T) {
 	user := dataprovider.User{}
 	fs := vfs.NewOsFs("id", os.TempDir(), "")
 	connection := &Connection{
-		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolWebDAV, user),
+		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolWebDAV, "", user),
 		request:        nil,
 	}
 	dirsToRemove := []objectMapping{}
@@ -432,10 +432,18 @@ func TestRemoteAddress(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Empty(t, req.RemoteAddr)
 
-	req.Header.Set("X-Forwarded-For", remoteAddr1)
+	req.Header.Set("True-Client-IP", remoteAddr1)
 	ip := utils.GetRealIP(req)
 	assert.Equal(t, remoteAddr1, ip)
-	// this will be ignore, remoteAddr1 is not allowed to se this header
+	req.Header.Del("True-Client-IP")
+	req.Header.Set("CF-Connecting-IP", remoteAddr1)
+	ip = utils.GetRealIP(req)
+	assert.Equal(t, remoteAddr1, ip)
+	req.Header.Del("CF-Connecting-IP")
+	req.Header.Set("X-Forwarded-For", remoteAddr1)
+	ip = utils.GetRealIP(req)
+	assert.Equal(t, remoteAddr1, ip)
+	// this will be ignored, remoteAddr1 is not allowed to se this header
 	req.Header.Set("X-Forwarded-For", remoteAddr2)
 	req.RemoteAddr = remoteAddr1
 	ip = server.checkRemoteAddress(req)
@@ -490,7 +498,7 @@ func TestResolvePathErrors(t *testing.T) {
 	user.Permissions["/"] = []string{dataprovider.PermAny}
 	fs := vfs.NewOsFs("connID", user.HomeDir, "")
 	connection := &Connection{
-		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolWebDAV, user),
+		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolWebDAV, "", user),
 	}
 
 	err := connection.Mkdir(ctx, "", os.ModePerm)
@@ -559,7 +567,7 @@ func TestFileAccessErrors(t *testing.T) {
 	user.Permissions["/"] = []string{dataprovider.PermAny}
 	fs := vfs.NewOsFs("connID", user.HomeDir, "")
 	connection := &Connection{
-		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolWebDAV, user),
+		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolWebDAV, "", user),
 	}
 	missingPath := "missing path"
 	fsMissingPath := filepath.Join(user.HomeDir, missingPath)
@@ -620,7 +628,7 @@ func TestRemoveDirTree(t *testing.T) {
 	user.Permissions["/"] = []string{dataprovider.PermAny}
 	fs := vfs.NewOsFs("connID", user.HomeDir, "")
 	connection := &Connection{
-		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolWebDAV, user),
+		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolWebDAV, "", user),
 	}
 
 	vpath := path.Join("adir", "missing")
@@ -671,11 +679,11 @@ func TestContentType(t *testing.T) {
 	user.Permissions["/"] = []string{dataprovider.PermAny}
 	fs := vfs.NewOsFs("connID", user.HomeDir, "")
 	connection := &Connection{
-		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolWebDAV, user),
+		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolWebDAV, "", user),
 	}
 	testFilePath := filepath.Join(user.HomeDir, testFile)
 	ctx := context.Background()
-	baseTransfer := common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFile,
+	baseTransfer := common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFilePath, testFile,
 		common.TransferDownload, 0, 0, 0, false, fs)
 	fs = newMockOsFs(nil, false, fs.ConnectionID(), user.GetHomeDir(), nil)
 	err := os.WriteFile(testFilePath, []byte(""), os.ModePerm)
@@ -720,10 +728,10 @@ func TestTransferReadWriteErrors(t *testing.T) {
 	user.Permissions["/"] = []string{dataprovider.PermAny}
 	fs := vfs.NewOsFs("connID", user.HomeDir, "")
 	connection := &Connection{
-		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolWebDAV, user),
+		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolWebDAV, "", user),
 	}
 	testFilePath := filepath.Join(user.HomeDir, testFile)
-	baseTransfer := common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFile,
+	baseTransfer := common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFilePath, testFile,
 		common.TransferUpload, 0, 0, 0, false, fs)
 	davFile := newWebDavFile(baseTransfer, nil, nil)
 	p := make([]byte, 1)
@@ -741,7 +749,7 @@ func TestTransferReadWriteErrors(t *testing.T) {
 	err = w.Close()
 	assert.NoError(t, err)
 
-	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFile,
+	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFilePath, testFile,
 		common.TransferDownload, 0, 0, 0, false, fs)
 	davFile = newWebDavFile(baseTransfer, nil, nil)
 	_, err = davFile.Read(p)
@@ -749,7 +757,7 @@ func TestTransferReadWriteErrors(t *testing.T) {
 	_, err = davFile.Stat()
 	assert.True(t, os.IsNotExist(err))
 
-	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFile,
+	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFilePath, testFile,
 		common.TransferDownload, 0, 0, 0, false, fs)
 	err = os.WriteFile(testFilePath, []byte(""), os.ModePerm)
 	assert.NoError(t, err)
@@ -774,7 +782,7 @@ func TestTransferReadWriteErrors(t *testing.T) {
 	r, w, err = pipeat.Pipe()
 	assert.NoError(t, err)
 	mockFs := newMockOsFs(nil, false, fs.ConnectionID(), user.HomeDir, r)
-	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFile,
+	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFilePath, testFile,
 		common.TransferDownload, 0, 0, 0, false, mockFs)
 	davFile = newWebDavFile(baseTransfer, nil, nil)
 
@@ -794,7 +802,7 @@ func TestTransferReadWriteErrors(t *testing.T) {
 	err = davFile.Close()
 	assert.NoError(t, err)
 
-	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFile,
+	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFilePath, testFile,
 		common.TransferDownload, 0, 0, 0, false, fs)
 	davFile = newWebDavFile(baseTransfer, nil, nil)
 	davFile.writer = f
@@ -813,11 +821,11 @@ func TestTransferSeek(t *testing.T) {
 	user.Permissions["/"] = []string{dataprovider.PermAny}
 	fs := vfs.NewOsFs("connID", user.HomeDir, "")
 	connection := &Connection{
-		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolWebDAV, user),
+		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolWebDAV, "", user),
 	}
 	testFilePath := filepath.Join(user.HomeDir, testFile)
 	testFileContents := []byte("content")
-	baseTransfer := common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFile,
+	baseTransfer := common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFilePath, testFile,
 		common.TransferUpload, 0, 0, 0, false, fs)
 	davFile := newWebDavFile(baseTransfer, nil, nil)
 	_, err := davFile.Seek(0, io.SeekStart)
@@ -825,7 +833,7 @@ func TestTransferSeek(t *testing.T) {
 	err = davFile.Close()
 	assert.NoError(t, err)
 
-	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFile,
+	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFilePath, testFile,
 		common.TransferDownload, 0, 0, 0, false, fs)
 	davFile = newWebDavFile(baseTransfer, nil, nil)
 	_, err = davFile.Seek(0, io.SeekCurrent)
@@ -839,14 +847,14 @@ func TestTransferSeek(t *testing.T) {
 		err = f.Close()
 		assert.NoError(t, err)
 	}
-	baseTransfer = common.NewBaseTransfer(f, connection.BaseConnection, nil, testFilePath, testFile,
+	baseTransfer = common.NewBaseTransfer(f, connection.BaseConnection, nil, testFilePath, testFilePath, testFile,
 		common.TransferDownload, 0, 0, 0, false, fs)
 	davFile = newWebDavFile(baseTransfer, nil, nil)
 	_, err = davFile.Seek(0, io.SeekStart)
 	assert.Error(t, err)
 	davFile.Connection.RemoveTransfer(davFile.BaseTransfer)
 
-	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFile,
+	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFilePath, testFile,
 		common.TransferDownload, 0, 0, 0, false, fs)
 	davFile = newWebDavFile(baseTransfer, nil, nil)
 	res, err := davFile.Seek(0, io.SeekStart)
@@ -861,14 +869,14 @@ func TestTransferSeek(t *testing.T) {
 	err = davFile.updateStatInfo()
 	assert.Nil(t, err)
 
-	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath+"1", testFile,
+	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath+"1", testFilePath+"1", testFile,
 		common.TransferDownload, 0, 0, 0, false, fs)
 	davFile = newWebDavFile(baseTransfer, nil, nil)
 	_, err = davFile.Seek(0, io.SeekEnd)
 	assert.True(t, os.IsNotExist(err))
 	davFile.Connection.RemoveTransfer(davFile.BaseTransfer)
 
-	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFile,
+	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath, testFilePath, testFile,
 		common.TransferDownload, 0, 0, 0, false, fs)
 	davFile = newWebDavFile(baseTransfer, nil, nil)
 	davFile.reader = f
@@ -883,7 +891,7 @@ func TestTransferSeek(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int64(5), res)
 
-	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath+"1", testFile,
+	baseTransfer = common.NewBaseTransfer(nil, connection.BaseConnection, nil, testFilePath+"1", testFilePath+"1", testFile,
 		common.TransferDownload, 0, 0, 0, false, fs)
 
 	davFile = newWebDavFile(baseTransfer, nil, nil)

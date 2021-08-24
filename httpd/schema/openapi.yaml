@@ -9,10 +9,15 @@ tags:
   - name: quota
   - name: folders
   - name: users
+  - name: users API
 info:
   title: SFTPGo
-  description: SFTPGo REST API
-  version: 2.0.5
+  description: |
+    SFTPGo allows to securely share your files over SFTP and optionally FTP/S and WebDAV too.
+    Several storage backends are supported and they are configurable per user, so you can serve a local directory for a user and an S3 bucket (or part of it) for another one.
+    SFTPGo also supports virtual folders, a virtual folder can use any of the supported storage backends. So you can have, for example, an S3 user that exposes a GCS bucket (or part of it) on a specified path and an encrypted local filesystem on another one.
+    Virtual folders can be private or shared among multiple users, for shared virtual folders you can define different quota limits for each user.
+  version: 2.1.0
   contact:
     name: API support
     url: 'https://github.com/drakkan/sftpgo'
@@ -48,7 +53,7 @@ paths:
         - BasicAuth: []
       tags:
         - token
-      summary: Get a new access token
+      summary: Get a new admin access token
       description: Returns an access token and its expiration
       operationId: get_token
       responses:
@@ -70,9 +75,55 @@ paths:
     get:
       tags:
         - token
-      summary: Invalidate
-      description: Allows to invalidate a token before its expiration
+      summary: Invalidate an admin access token
+      description: Allows to invalidate an admin token before its expiration
       operationId: logout
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+  /user/token:
+    get:
+      security:
+        - BasicAuth: []
+      tags:
+        - token
+      summary: Get a new user access token
+      description: Returns an access token and its expiration
+      operationId: get_user_token
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Token'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+  /user/logout:
+    get:
+      tags:
+        - token
+      summary: Invalidate a user access token
+      description: Allows to invalidate a client token before its expiration
+      operationId: client_logout
       responses:
         '200':
           description: successful operation
@@ -111,6 +162,35 @@ paths:
         default:
           $ref: '#/components/responses/DefaultResponse'
   /changepwd/admin:
+    put:
+      tags:
+        - admins
+      summary: Change admin password
+      description: Changes the password for the logged in admin. Please use '/admin/changepwd' instead
+      operationId: change_admin_password_deprecated
+      deprecated: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PwdChange'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+  /admin/changepwd:
     put:
       tags:
         - admins
@@ -195,12 +275,93 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         default:
           $ref: '#/components/responses/DefaultResponse'
-  /defender/bantime:
+  /defender/hosts:
     get:
       tags:
         - defender
+      summary: Get hosts
+      description: Returns hosts that are banned or for which some violations have been detected
+      operationId: get_defender_hosts
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DefenderEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+  /defender/hosts/{id}:
+    parameters:
+      - name: id
+        in: path
+        description: host id
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+        - defender
+      summary: Get host by id
+      description: Returns the host with the given id, if it exists
+      operationId: get_defender_host_by_id
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefenderEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+    delete:
+      tags:
+        - defender
+      summary: Removes a host from the defender lists
+      description: Unbans the specified host or clears its violations
+      operationId: delete_defender_host_by_id
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+  /defender/bantime:
+    get:
+      deprecated: true
+      tags:
+        - defender
       summary: Get ban time
-      description: Returns the ban time for the specified IPv4/IPv6 address
+      description: Deprecated, please use '/defender/hosts', '/defender/hosts/{id}' instead
       operationId: get_ban_time
       parameters:
         - in: query
@@ -228,10 +389,11 @@ paths:
           $ref: '#/components/responses/DefaultResponse'
   /defender/unban:
     post:
+      deprecated: true
       tags:
         - defender
       summary: Unban
-      description: Removes the specified IPv4/IPv6 from the banned ones
+      description: Deprecated, please use '/defender/hosts/{id}' instead
       operationId: unban_host
       requestBody:
         required: true
@@ -264,10 +426,11 @@ paths:
           $ref: '#/components/responses/DefaultResponse'
   /defender/score:
     get:
+      deprecated: true
       tags:
         - defender
       summary: Get score
-      description: Returns the score for the specified IPv4/IPv6 address
+      description: Deprecated, please use '/defender/hosts', '/defender/hosts/{id}' instead
       operationId: get_score
       parameters:
         - in: query
@@ -293,13 +456,282 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         default:
           $ref: '#/components/responses/DefaultResponse'
-  /quota-scans:
+  /quotas/users/scans:
     get:
       tags:
         - quota
+      summary: Get active user quota scans
+      description: Returns the active user quota scans
+      operationId: get_users_quota_scans
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/QuotaScan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+  /quotas/users/{username}/scan:
+    parameters:
+      - name: username
+        in: path
+        description: the username
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+        - quota
+      summary: Start a user quota scan
+      description: Starts a new quota scan for the given user. A quota scan updates the number of files and their total size for the specified user and the virtual folders, if any, included in his quota
+      operationId: start_user_quota_scan
+      responses:
+        '202':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                message: Scan started
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+  /quotas/users/{username}/usage:
+    parameters:
+      - name: username
+        in: path
+        description: the username
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: mode
+        required: false
+        description: the update mode specifies if the given quota usage values should be added or replace the current ones
+        schema:
+          type: string
+          enum:
+            - add
+            - reset
+          description: |
+            Update type:
+                * `add` - add the specified quota limits to the current used ones
+                * `reset` - reset the values to the specified ones. This is the default
+          example: reset
+    put:
+      tags:
+        - quota
+      summary: Update quota usage limits
+      description: Sets the current used quota limits for the given user
+      operationId: user_quota_update_usage
+      parameters:
+        - in: query
+          name: mode
+          required: false
+          description: the update mode specifies if the given quota usage values should be added or replace the current ones
+          schema:
+            type: string
+            enum:
+              - add
+              - reset
+            description: |
+              Update type:
+                * `add` - add the specified quota limits to the current used ones
+                * `reset` - reset the values to the specified ones. This is the default
+            example: reset
+      requestBody:
+        required: true
+        description: 'If used_quota_size and used_quota_files are missing they will default to 0, this means that if mode is "add" the current value, for the missing field, will remain unchanged, if mode is "reset" the missing field is set to 0'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuotaUsage'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                message: Quota updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+  /quotas/folders/scans:
+    get:
+      tags:
+        - quota
+      summary: Get active folder quota scans
+      description: Returns the active folder quota scans
+      operationId: get_folders_quota_scans
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FolderQuotaScan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+  /quotas/folders/{name}/scan:
+    parameters:
+      - name: name
+        in: path
+        description: folder name
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+        - quota
+      summary: Start a folder quota scan
+      description: Starts a new quota scan for the given folder. A quota scan update the number of files and their total size for the specified folder
+      operationId: start_folder_quota_scan
+      responses:
+        '202':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                message: Scan started
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+  /quotas/folders/{name}/usage:
+    parameters:
+      - name: name
+        in: path
+        description: folder name
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: mode
+        required: false
+        description: the update mode specifies if the given quota usage values should be added or replace the current ones
+        schema:
+          type: string
+          enum:
+            - add
+            - reset
+          description: |
+            Update type:
+                * `add` - add the specified quota limits to the current used ones
+                * `reset` - reset the values to the specified ones. This is the default
+          example: reset
+    put:
+      tags:
+        - quota
+      summary: Update folder quota usage limits
+      description: Sets the current used quota limits for the given folder
+      operationId: folder_quota_update_usage
+      parameters:
+        - in: query
+          name: mode
+          required: false
+          description: the update mode specifies if the given quota usage values should be added or replace the current ones
+          schema:
+            type: string
+            enum:
+              - add
+              - reset
+            description: |
+              Update type:
+                * `add` - add the specified quota limits to the current used ones
+                * `reset` - reset the values to the specified ones. This is the default
+            example: reset
+      requestBody:
+        required: true
+        description: 'If used_quota_size and used_quota_files are missing they will default to 0, this means that if mode is "add" the current value, for the missing field, will remain unchanged, if mode is "reset" the missing field is set to 0'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuotaUsage'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                message: Quota updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+  /quota-scans:
+    get:
+      deprecated: true
+      tags:
+        - quota
       summary: Get quota scans
-      description: Returns active user quota scans
-      operationId: get_quota_scans
+      description: Deprecated, please use '/quotas/users/scans' instead
+      operationId: get_users_quota_scans_deprecated
       responses:
         '200':
           description: successful operation
@@ -318,11 +750,12 @@ paths:
         default:
           $ref: '#/components/responses/DefaultResponse'
     post:
+      deprecated: true
       tags:
         - quota
       summary: Start user quota scan
-      description: Starts a new quota scan for the given user. A quota scan updates the number of files and their total size for the specified user and the virtual folders, if any, included in his quota
-      operationId: start_quota_scan
+      description: Deprecated, please use '/quotas/users/{username}/scan' instead
+      operationId: start_user_quota_scan_deprecated
       requestBody:
         required: true
         content:
@@ -354,11 +787,12 @@ paths:
           $ref: '#/components/responses/DefaultResponse'
   /quota-update:
     put:
+      deprecated: true
       tags:
         - quota
-      summary: Update user quota limits
-      description: Sets the current used quota limits for the given user
-      operationId: quota_update
+      summary: Update quota usage limits
+      description: Deprecated, please use '/quotas/users/{username}/usage' instead
+      operationId: user_quota_update_usage_deprecated
       parameters:
         - in: query
           name: mode
@@ -398,19 +832,18 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
         default:
           $ref: '#/components/responses/DefaultResponse'
   /folder-quota-update:
     put:
+      deprecated: true
       tags:
         - quota
       summary: Update folder quota limits
-      description: Sets the current used quota limits for the given folder
-      operationId: folder_quota_update
+      description: Deprecated, please use '/quotas/folders/{name}/usage' instead
+      operationId: folder_quota_update_usage_deprecated
       parameters:
         - in: query
           name: mode
@@ -450,19 +883,18 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
         default:
           $ref: '#/components/responses/DefaultResponse'
   /folder-quota-scans:
     get:
+      deprecated: true
       tags:
         - quota
       summary: Get folders quota scans
-      description: Returns the active quota scans for folders
-      operationId: get_folders_quota_scans
+      description: Deprecated, please use '/quotas/folders/scans' instead
+      operationId: get_folders_quota_scans_deprecated
       responses:
         '200':
           description: successful operation
@@ -481,11 +913,12 @@ paths:
         default:
           $ref: '#/components/responses/DefaultResponse'
     post:
+      deprecated: true
       tags:
         - quota
-      summary: Start folder quota scan
-      description: Starts a new quota scan for the given folder. A quota scan update the number of files and their total size for the specified folder
-      operationId: start_folder_quota_scan
+      summary: Start a folder quota scan
+      description: Deprecated, please use '/quotas/folders/{name}/scan' instead
+      operationId: start_folder_quota_scan_deprecated
       requestBody:
         required: true
         content:
@@ -1238,6 +1671,198 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         default:
           $ref: '#/components/responses/DefaultResponse'
+  /user/changepwd:
+    put:
+      tags:
+        - users API
+      summary: Change user password
+      description: Changes the password for the logged in user
+      operationId: change_user_password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PwdChange'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+  /user/publickeys:
+    get:
+      tags:
+        - users API
+      summary: Get the user's public keys
+      description: Returns the public keys for the logged in user
+      operationId: get_user_public_keys
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+    put:
+      tags:
+        - users API
+      summary: Set the user's public keys
+      description: Sets the public keys for the logged in user. Public keys must be in OpenSSH format
+      operationId: set_user_public_keys
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+                description: Public key in OpenSSH format
+                example: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPVILdH2u3yV5SAeE6XksD1z1vXRg0E4hJUov8ITDAZ2 user@host
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+  /user/folder:
+    get:
+      tags:
+        - users API
+      summary: Read folders contents
+      description: Returns the contents of the specified folder for the logged in user
+      operationId: get_user_folder_contents
+      parameters:
+        - in: query
+          name: path
+          description: Path to the folder to read. It must be URL encoded, for example the path "my dir/àdir" must be sent as "my%20dir%2F%C3%A0dir". If empty or missing the root folder is assumed
+          schema:
+            type: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DirEntry'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+  /user/file:
+    get:
+      tags:
+        - users API
+      summary: Download a single file
+      description: Returns the file contents as response body
+      operationId: get_user_file
+      parameters:
+        - in: query
+          name: path
+          required: true
+          description: Path to the file to download. It must be URL encoded, for example the path "my dir/àdir/file.txt" must be sent as "my%20dir%2F%C3%A0dir%2Ffile.txt"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+        '206':
+          description: successful operation
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
+  /user/streamzip:
+    post:
+      tags:
+        - users API
+      summary: Download multiple files and folders as a single zip file
+      description: A zip file, containing the specified files and folders, will be generated on the fly and returned as response body. Only folders and regular files will be included in the zip
+      operationId: streamzip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+                description: Absolute file or folder path
+      responses:
+        '200':
+          description: successful operation
+          content:
+            'application/zip':
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        default:
+          $ref: '#/components/responses/DefaultResponse'
 components:
   responses:
     BadRequest:
@@ -1410,27 +2035,6 @@ components:
           description: 'list of, case insensitive, denied shell like file patterns. Denied patterns are evaluated before the allowed ones'
           example:
             - '*.zip'
-    ExtensionsFilter:
-      type: object
-      properties:
-        path:
-          type: string
-          description: 'exposed virtual path, if no other specific filter is defined, the filter apply for sub directories too. For example if filters are defined for the paths "/" and "/sub" then the filters for "/" are applied for any file outside the "/sub" directory'
-        allowed_extensions:
-          type: array
-          items:
-            type: string
-          description: 'list of, case insensitive, allowed files extension. Shell like expansion is not supported so you have to specify `.jpg` and not `*.jpg`'
-          example:
-            - .jpg
-            - .png
-        denied_extensions:
-          type: array
-          items:
-            type: string
-          description: 'list of, case insensitive, denied files extension. Denied file extensions are evaluated before the allowed ones'
-          example:
-            - .zip
     HooksFilter:
       type: object
       properties:
@@ -1480,11 +2084,6 @@ components:
           items:
             $ref: '#/components/schemas/PatternsFilter'
           description: 'filters based on shell like file patterns. These restrictions do not apply to files listing for performance reasons, so a denied file cannot be downloaded/overwritten/renamed but it will still be in the list of files. Please note that these restrictions can be easily bypassed'
-        file_extensions:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExtensionsFilter'
-          description: 'filters based on shell like patterns. Deprecated, use file_patterns. These restrictions do not apply to files listing for performance reasons, so a denied file cannot be downloaded/overwritten/renamed but it will still be in the list of files. Please note that these restrictions can be easily bypassed'
         max_upload_file_size:
           type: integer
           format: int64
@@ -1595,8 +2194,7 @@ components:
         account_key:
           $ref: '#/components/schemas/Secret'
         sas_url:
-          type: string
-          description: 'Shared access signature URL, leave blank if using account/key'
+          $ref: '#/components/schemas/Secret'
         endpoint:
           type: string
           description: 'optional endpoint. Default is "blob.core.windows.net". If you use the emulator the endpoint must include the protocol, for example "http://127.0.0.1:10000"'
@@ -1773,7 +2371,8 @@ components:
           type: array
           items:
             type: string
-          description: a password or at least one public key/SSH user certificate are mandatory.
+            example: ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEUWwDwEWhTbF0MqAsp/oXK1HR2cElhM8oo1uVmL3ZeDKDiTm4ljMr92wfTgIGDqIoxmVqgYIkAOAhuykAVWBzc= user@host
+          description: Public keys in OpenSSH format. A password or at least one public key/SSH user certificate are mandatory.
         home_dir:
           type: string
           description: path to the user home directory. The user cannot upload or download files outside this directory. SFTPGo tries to automatically create this folder if missing. Must be an absolute path
@@ -1895,6 +2494,15 @@ components:
         additional_info:
           type: string
           description: Free form text field
+    QuotaUsage:
+      type: object
+      properties:
+        used_quota_size:
+          type: integer
+          format: int64
+        used_quota_files:
+          type: integer
+          format: int32
     Transfer:
       type: object
       properties:
@@ -1976,6 +2584,20 @@ components:
           type: integer
           format: int64
           description: scan start time as unix timestamp in milliseconds
+    DefenderEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        ip:
+          type: string
+        score:
+          type: integer
+          description: the score increases whenever a violation is detected, such as an attempt to log in using an incorrect password or invalid username. If the score exceeds the configured threshold, the IP is banned. Omitted for banned IPs
+        ban_time:
+          type: string
+          format: date-time
+          description: date time until the IP is banned. For already banned hosts, the ban time is increased each time a new violation is detected. Omitted if the IP is not banned
     SSHHostKey:
       type: object
       properties:
@@ -2146,6 +2768,27 @@ components:
           type: string
         new_password:
           type: string
+    DirEntry:
+      type: object
+      properties:
+        name:
+          type: string
+          description: name of the file (or subdirectory) described by the entry. This name is the final element of the path (the base name), not the entire path
+        size:
+          type: integer
+          format: int64
+          description: file size, omitted for folders and non regular files
+        mode:
+          type: integer
+          description: |
+            File mode and permission bits. More details here: https://golang.org/pkg/io/fs/#FileMode.
+            Let's see some examples:
+            - for a directory mode&2147483648 != 0
+            - for a symlink mode&134217728 != 0
+            - for a regular file mode&2401763328 == 0
+        last_modified:
+          type: string
+          format: date-time
     ApiResponse:
       type: object
       properties:

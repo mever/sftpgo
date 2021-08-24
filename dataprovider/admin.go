@@ -41,6 +41,7 @@ var (
 )
 
 // AdminFilters defines additional restrictions for SFTPGo admins
+// TODO: rename to AdminOptions in v3
 type AdminFilters struct {
 	// only clients connecting from these IP/Mask are allowed.
 	// IP/Mask must be in CIDR notation as defined in RFC 4632 and RFC 4291
@@ -65,7 +66,7 @@ type Admin struct {
 }
 
 func (a *Admin) checkPassword() error {
-	if a.Password != "" && !strings.HasPrefix(a.Password, argonPwdPrefix) {
+	if a.Password != "" && !utils.IsStringPrefixInSlice(a.Password, internalHashPwdPrefixes) {
 		if config.PasswordHashing.Algo == HashingAlgoBcrypt {
 			pwd, err := bcrypt.GenerateFromPassword([]byte(a.Password), config.PasswordHashing.BcryptOptions.Cost)
 			if err != nil {

@@ -66,7 +66,7 @@ const (
 	CockroachDataProviderName = "cockroachdb"
 	// DumpVersion defines the version for the dump.
 	// For restore/load we support the current version and the previous one
-	DumpVersion = 7
+	DumpVersion = 8
 
 	argonPwdPrefix            = "$argon2id$"
 	bcryptPwdPrefix           = "$2a$"
@@ -118,13 +118,14 @@ var (
 	// ErrNoInitRequired defines the error returned by InitProvider if no inizialization/update is required
 	ErrNoInitRequired = errors.New("the data provider is up to date")
 	// ErrInvalidCredentials defines the error to return if the supplied credentials are invalid
-	ErrInvalidCredentials = errors.New("invalid credentials")
-	isAdminCreated        = int32(0)
-	validTLSUsernames     = []string{string(TLSUsernameNone), string(TLSUsernameCN)}
-	config                Config
-	provider              Provider
-	sqlPlaceholders       []string
-	hashPwdPrefixes       = []string{argonPwdPrefix, bcryptPwdPrefix, pbkdf2SHA1Prefix, pbkdf2SHA256Prefix,
+	ErrInvalidCredentials   = errors.New("invalid credentials")
+	isAdminCreated          = int32(0)
+	validTLSUsernames       = []string{string(TLSUsernameNone), string(TLSUsernameCN)}
+	config                  Config
+	provider                Provider
+	sqlPlaceholders         []string
+	internalHashPwdPrefixes = []string{argonPwdPrefix, bcryptPwdPrefix}
+	hashPwdPrefixes         = []string{argonPwdPrefix, bcryptPwdPrefix, pbkdf2SHA1Prefix, pbkdf2SHA256Prefix,
 		pbkdf2SHA512Prefix, pbkdf2SHA256B64SaltPrefix, md5cryptPwdPrefix, md5cryptApr1PwdPrefix, sha512cryptPwdPrefix}
 	pbkdfPwdPrefixes        = []string{pbkdf2SHA1Prefix, pbkdf2SHA256Prefix, pbkdf2SHA512Prefix, pbkdf2SHA256B64SaltPrefix}
 	pbkdfPwdB64SaltPrefixes = []string{pbkdf2SHA256B64SaltPrefix}
@@ -141,6 +142,7 @@ var (
 	argon2Params            *argon2id.Params
 	lastLoginMinDelay       = 10 * time.Minute
 	usernameRegex           = regexp.MustCompile("^[a-zA-Z0-9-_.~]+$")
+	tempPath                string
 )
 
 type schemaVersion struct {
@@ -402,6 +404,13 @@ func (e *RecordNotFoundError) Error() string {
 	return fmt.Sprintf("not found: %s", e.err)
 }
 
+// NewRecordNotFoundError returns a not found error
+func NewRecordNotFoundError(error string) *RecordNotFoundError {
+	return &RecordNotFoundError{
+		err: error,
+	}
+}
+
 // GetQuotaTracking returns the configured mode for user's quota tracking
 func GetQuotaTracking() int {
 	return config.TrackQuota
@@ -447,6 +456,11 @@ type Provider interface {
 type fsValidatorHelper interface {
 	GetGCSCredentialsFilePath() string
 	GetEncrytionAdditionalData() string
+}
+
+// SetTempPath sets the path for temporary files
+func SetTempPath(fsPath string) {
+	tempPath = fsPath
 }
 
 // Initialize the data provider.
@@ -1097,8 +1111,15 @@ func buildUserHomeDir(user *User) {
 	if user.HomeDir == "" {
 		if config.UsersBaseDir != "" {
 			user.HomeDir = filepath.Join(config.UsersBaseDir, user.Username)
-		} else if user.FsConfig.Provider == vfs.SFTPFilesystemProvider {
-			user.HomeDir = filepath.Join(os.TempDir(), user.Username)
+			return
+		}
+		switch user.FsConfig.Provider {
+		case vfs.SFTPFilesystemProvider, vfs.S3FilesystemProvider, vfs.AzureBlobFilesystemProvider, vfs.GCSFilesystemProvider:
+			if tempPath != "" {
+				user.HomeDir = filepath.Join(tempPath, user.Username)
+			} else {
+				user.HomeDir = filepath.Join(os.TempDir(), user.Username)
+			}
 		}
 	}
 }
@@ -1271,12 +1292,18 @@ func validatePublicKeys(user *User) error {
 	if len(user.PublicKeys) == 0 {
 		user.PublicKeys = []string{}
 	}
+	var validatedKeys []string
 	for i, k := range user.PublicKeys {
+		if k == "" {
+			continue
+		}
 		_, _, _, _, err := ssh.ParseAuthorizedKey([]byte(k))
 		if err != nil {
-			return &ValidationError{err: fmt.Sprintf("could not parse key nr. %d: %s", i, err)}
+			return &ValidationError{err: fmt.Sprintf("could not parse key nr. %d: %s", i+1, err)}
 		}
+		validatedKeys = append(validatedKeys, k)
 	}
+	user.PublicKeys = utils.RemoveDuplicates(validatedKeys)
 	return nil
 }
 
@@ -1322,49 +1349,6 @@ func validateFiltersPatternExtensions(user *User) error {
 	}
 	user.Filters.FilePatterns = filters
 	return nil
-}
-
-func validateFiltersFileExtensions(user *User) error {
-	if len(user.Filters.FileExtensions) == 0 {
-		user.Filters.FileExtensions = []ExtensionsFilter{}
-		return nil
-	}
-	filteredPaths := []string{}
-	var filters []ExtensionsFilter
-	for _, f := range user.Filters.FileExtensions {
-		cleanedPath := filepath.ToSlash(path.Clean(f.Path))
-		if !path.IsAbs(cleanedPath) {
-			return &ValidationError{err: fmt.Sprintf("invalid path %#v for file extensions filter", f.Path)}
-		}
-		if utils.IsStringInSlice(cleanedPath, filteredPaths) {
-			return &ValidationError{err: fmt.Sprintf("duplicate file extensions filter for path %#v", f.Path)}
-		}
-		if len(f.AllowedExtensions) == 0 && len(f.DeniedExtensions) == 0 {
-			return &ValidationError{err: fmt.Sprintf("empty file extensions filter for path %#v", f.Path)}
-		}
-		f.Path = cleanedPath
-		allowed := make([]string, 0, len(f.AllowedExtensions))
-		denied := make([]string, 0, len(f.DeniedExtensions))
-		for _, ext := range f.AllowedExtensions {
-			allowed = append(allowed, strings.ToLower(ext))
-		}
-		for _, ext := range f.DeniedExtensions {
-			denied = append(denied, strings.ToLower(ext))
-		}
-		f.AllowedExtensions = allowed
-		f.DeniedExtensions = denied
-		filters = append(filters, f)
-		filteredPaths = append(filteredPaths, cleanedPath)
-	}
-	user.Filters.FileExtensions = filters
-	return nil
-}
-
-func validateFileFilters(user *User) error {
-	if err := validateFiltersFileExtensions(user); err != nil {
-		return err
-	}
-	return validateFiltersPatternExtensions(user)
 }
 
 func checkEmptyFiltersStruct(user *User) {
@@ -1422,7 +1406,7 @@ func validateFilters(user *User) error {
 			return &ValidationError{err: fmt.Sprintf("invalid web client options %#v", opts)}
 		}
 	}
-	return validateFileFilters(user)
+	return validateFiltersPatternExtensions(user)
 }
 
 func saveGCSCredentials(fsConfig *vfs.Filesystem, helper fsValidatorHelper) error {
@@ -1613,10 +1597,7 @@ func ValidateFolder(folder *vfs.BaseVirtualFolder) error {
 	if err := validateFilesystemConfig(&folder.FsConfig, folder); err != nil {
 		return err
 	}
-	if err := saveGCSCredentials(&folder.FsConfig, folder); err != nil {
-		return err
-	}
-	return nil
+	return saveGCSCredentials(&folder.FsConfig, folder)
 }
 
 // ValidateUser returns an error if the user is not valid
@@ -1651,10 +1632,7 @@ func ValidateUser(user *User) error {
 	if err := validateFilters(user); err != nil {
 		return err
 	}
-	if err := saveGCSCredentials(&user.FsConfig, user); err != nil {
-		return err
-	}
-	return nil
+	return saveGCSCredentials(&user.FsConfig, user)
 }
 
 func checkLoginConditions(user *User) error {
@@ -1965,15 +1943,14 @@ func validateKeyboardAuthResponse(response keyboardAuthHookResponse) error {
 	return nil
 }
 
-func sendKeyboardAuthHTTPReq(url *url.URL, request keyboardAuthHookRequest) (keyboardAuthHookResponse, error) {
+func sendKeyboardAuthHTTPReq(url string, request keyboardAuthHookRequest) (keyboardAuthHookResponse, error) {
 	var response keyboardAuthHookResponse
-	httpClient := httpclient.GetHTTPClient()
 	reqAsJSON, err := json.Marshal(request)
 	if err != nil {
 		providerLog(logger.LevelWarn, "error serializing keyboard interactive auth request: %v", err)
 		return response, err
 	}
-	resp, err := httpClient.Post(url.String(), "application/json", bytes.NewBuffer(reqAsJSON))
+	resp, err := httpclient.Post(url, "application/json", bytes.NewBuffer(reqAsJSON))
 	if err != nil {
 		providerLog(logger.LevelWarn, "error getting keyboard interactive auth hook HTTP response: %v", err)
 		return response, err
@@ -1988,12 +1965,6 @@ func sendKeyboardAuthHTTPReq(url *url.URL, request keyboardAuthHookRequest) (key
 
 func executeKeyboardInteractiveHTTPHook(user *User, authHook string, client ssh.KeyboardInteractiveChallenge, ip, protocol string) (int, error) {
 	authResult := 0
-	var url *url.URL
-	url, err := url.Parse(authHook)
-	if err != nil {
-		providerLog(logger.LevelWarn, "invalid url for keyboard interactive hook %#v, error: %v", authHook, err)
-		return authResult, err
-	}
 	requestID := xid.New().String()
 	req := keyboardAuthHookRequest{
 		Username:  user.Username,
@@ -2002,8 +1973,9 @@ func executeKeyboardInteractiveHTTPHook(user *User, authHook string, client ssh.
 		RequestID: requestID,
 	}
 	var response keyboardAuthHookResponse
+	var err error
 	for {
-		response, err = sendKeyboardAuthHTTPReq(url, req)
+		response, err = sendKeyboardAuthHTTPReq(authHook, req)
 		if err != nil {
 			return authResult, err
 		}
@@ -2173,12 +2145,6 @@ func isCheckPasswordHookDefined(protocol string) bool {
 func getPasswordHookResponse(username, password, ip, protocol string) ([]byte, error) {
 	if strings.HasPrefix(config.CheckPasswordHook, "http") {
 		var result []byte
-		var url *url.URL
-		url, err := url.Parse(config.CheckPasswordHook)
-		if err != nil {
-			providerLog(logger.LevelWarn, "invalid url for check password hook %#v, error: %v", config.CheckPasswordHook, err)
-			return result, err
-		}
 		req := checkPasswordRequest{
 			Username: username,
 			Password: password,
@@ -2189,8 +2155,7 @@ func getPasswordHookResponse(username, password, ip, protocol string) ([]byte, e
 		if err != nil {
 			return result, err
 		}
-		httpClient := httpclient.GetHTTPClient()
-		resp, err := httpClient.Post(url.String(), "application/json", bytes.NewBuffer(reqAsJSON))
+		resp, err := httpclient.Post(config.CheckPasswordHook, "application/json", bytes.NewBuffer(reqAsJSON))
 		if err != nil {
 			providerLog(logger.LevelWarn, "error getting check password hook response: %v", err)
 			return result, err
@@ -2245,8 +2210,8 @@ func getPreLoginHookResponse(loginMethod, ip, protocol string, userAsJSON []byte
 		q.Add("ip", ip)
 		q.Add("protocol", protocol)
 		url.RawQuery = q.Encode()
-		httpClient := httpclient.GetHTTPClient()
-		resp, err := httpClient.Post(url.String(), "application/json", bytes.NewBuffer(userAsJSON))
+
+		resp, err := httpclient.Post(url.String(), "application/json", bytes.NewBuffer(userAsJSON))
 		if err != nil {
 			providerLog(logger.LevelWarn, "error getting pre-login hook response: %v", err)
 			return result, err
@@ -2371,8 +2336,7 @@ func ExecutePostLoginHook(user *User, loginMethod, ip, protocol string, err erro
 
 			startTime := time.Now()
 			respCode := 0
-			httpClient := httpclient.GetRetraybleHTTPClient()
-			resp, err := httpClient.Post(url.String(), "application/json", bytes.NewBuffer(userAsJSON))
+			resp, err := httpclient.RetryablePost(url.String(), "application/json", bytes.NewBuffer(userAsJSON))
 			if err == nil {
 				respCode = resp.StatusCode
 				resp.Body.Close()
@@ -2406,14 +2370,7 @@ func getExternalAuthResponse(username, password, pkey, keyboardInteractive, ip, 
 		}
 	}
 	if strings.HasPrefix(config.ExternalAuthHook, "http") {
-		var url *url.URL
 		var result []byte
-		url, err := url.Parse(config.ExternalAuthHook)
-		if err != nil {
-			providerLog(logger.LevelWarn, "invalid url for external auth hook %#v, error: %v", config.ExternalAuthHook, err)
-			return result, err
-		}
-		httpClient := httpclient.GetHTTPClient()
 		authRequest := make(map[string]string)
 		authRequest["username"] = username
 		authRequest["ip"] = ip
@@ -2430,7 +2387,7 @@ func getExternalAuthResponse(username, password, pkey, keyboardInteractive, ip, 
 			providerLog(logger.LevelWarn, "error serializing external auth request: %v", err)
 			return result, err
 		}
-		resp, err := httpClient.Post(url.String(), "application/json", bytes.NewBuffer(authRequestAsJSON))
+		resp, err := httpclient.Post(config.ExternalAuthHook, "application/json", bytes.NewBuffer(authRequestAsJSON))
 		if err != nil {
 			providerLog(logger.LevelWarn, "error getting external auth hook HTTP response: %v", err)
 			return result, err
@@ -2614,8 +2571,7 @@ func executeAction(operation string, user *User) {
 			q.Add("action", operation)
 			url.RawQuery = q.Encode()
 			startTime := time.Now()
-			httpClient := httpclient.GetRetraybleHTTPClient()
-			resp, err := httpClient.Post(url.String(), "application/json", bytes.NewBuffer(userAsJSON))
+			resp, err := httpclient.RetryablePost(url.String(), "application/json", bytes.NewBuffer(userAsJSON))
 			respCode := 0
 			if err == nil {
 				respCode = resp.StatusCode

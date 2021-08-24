@@ -46,58 +46,73 @@ import (
 )
 
 const (
-	defaultUsername           = "test_user"
-	defaultPassword           = "test_password"
-	testPubKey                = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC03jj0D+djk7pxIf/0OhrxrchJTRZklofJ1NoIu4752Sq02mdXmarMVsqJ1cAjV5LBVy3D1F5U6XW4rppkXeVtd04Pxb09ehtH0pRRPaoHHlALiJt8CoMpbKYMA8b3KXPPriGxgGomvtU2T2RMURSwOZbMtpsugfjYSWenyYX+VORYhylWnSXL961LTyC21ehd6d6QnW9G7E5hYMITMY9TuQZz3bROYzXiTsgN0+g6Hn7exFQp50p45StUMfV/SftCMdCxlxuyGny2CrN/vfjO7xxOo2uv7q1qm10Q46KPWJQv+pgZ/OfL+EDjy07n5QVSKHlbx+2nT4Q0EgOSQaCTYwn3YjtABfIxWwgAFdyj6YlPulCL22qU4MYhDcA6PSBwDdf8hvxBfvsiHdM+JcSHvv8/VeJhk6CmnZxGY0fxBupov27z3yEO8nAg8k+6PaUiW1MSUfuGMF/ktB8LOstXsEPXSszuyXiOv4DaryOXUiSn7bmRqKcEFlJusO6aZP0= nicola@p1"
-	defaultTokenAuthUser      = "admin"
-	defaultTokenAuthPass      = "password"
-	altAdminUsername          = "newTestAdmin"
-	altAdminPassword          = "password1"
-	csrfFormToken             = "_form_token"
-	tokenPath                 = "/api/v2/token"
-	userPath                  = "/api/v2/users"
-	adminPath                 = "/api/v2/admins"
-	adminPwdPath              = "/api/v2/changepwd/admin"
-	folderPath                = "/api/v2/folders"
-	activeConnectionsPath     = "/api/v2/connections"
-	serverStatusPath          = "/api/v2/status"
-	quotaScanPath             = "/api/v2/quota-scans"
-	quotaScanVFolderPath      = "/api/v2/folder-quota-scans"
-	updateUsedQuotaPath       = "/api/v2/quota-update"
-	updateFolderUsedQuotaPath = "/api/v2/folder-quota-update"
-	defenderUnban             = "/api/v2/defender/unban"
-	versionPath               = "/api/v2/version"
-	logoutPath                = "/api/v2/logout"
-	healthzPath               = "/healthz"
-	webBasePath               = "/web"
-	webBasePathAdmin          = "/web/admin"
-	webAdminSetupPath         = "/web/admin/setup"
-	webLoginPath              = "/web/admin/login"
-	webLogoutPath             = "/web/admin/logout"
-	webUsersPath              = "/web/admin/users"
-	webUserPath               = "/web/admin/user"
-	webFoldersPath            = "/web/admin/folders"
-	webFolderPath             = "/web/admin/folder"
-	webConnectionsPath        = "/web/admin/connections"
-	webStatusPath             = "/web/admin/status"
-	webAdminsPath             = "/web/admin/managers"
-	webAdminPath              = "/web/admin/manager"
-	webMaintenancePath        = "/web/admin/maintenance"
-	webRestorePath            = "/web/admin/restore"
-	webChangeAdminPwdPath     = "/web/admin/changepwd"
-	webTemplateUser           = "/web/admin/template/user"
-	webTemplateFolder         = "/web/admin/template/folder"
-	webBasePathClient         = "/web/client"
-	webClientLoginPath        = "/web/client/login"
-	webClientFilesPath        = "/web/client/files"
-	webClientCredentialsPath  = "/web/client/credentials"
-	webChangeClientPwdPath    = "/web/client/changepwd"
-	webChangeClientKeysPath   = "/web/client/managekeys"
-	webClientLogoutPath       = "/web/client/logout"
-	httpBaseURL               = "http://127.0.0.1:8081"
-	sftpServerAddr            = "127.0.0.1:8022"
-	configDir                 = ".."
-	httpsCert                 = `-----BEGIN CERTIFICATE-----
+	defaultUsername                 = "test_user"
+	defaultPassword                 = "test_password"
+	testPubKey                      = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC03jj0D+djk7pxIf/0OhrxrchJTRZklofJ1NoIu4752Sq02mdXmarMVsqJ1cAjV5LBVy3D1F5U6XW4rppkXeVtd04Pxb09ehtH0pRRPaoHHlALiJt8CoMpbKYMA8b3KXPPriGxgGomvtU2T2RMURSwOZbMtpsugfjYSWenyYX+VORYhylWnSXL961LTyC21ehd6d6QnW9G7E5hYMITMY9TuQZz3bROYzXiTsgN0+g6Hn7exFQp50p45StUMfV/SftCMdCxlxuyGny2CrN/vfjO7xxOo2uv7q1qm10Q46KPWJQv+pgZ/OfL+EDjy07n5QVSKHlbx+2nT4Q0EgOSQaCTYwn3YjtABfIxWwgAFdyj6YlPulCL22qU4MYhDcA6PSBwDdf8hvxBfvsiHdM+JcSHvv8/VeJhk6CmnZxGY0fxBupov27z3yEO8nAg8k+6PaUiW1MSUfuGMF/ktB8LOstXsEPXSszuyXiOv4DaryOXUiSn7bmRqKcEFlJusO6aZP0= nicola@p1"
+	testPubKey1                     = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCd60+/j+y8f0tLftihWV1YN9RSahMI9btQMDIMqts/jeNbD8jgoogM3nhF7KxfcaMKURuD47KC4Ey6iAJUJ0sWkSNNxOcIYuvA+5MlspfZDsa8Ag76Fe1vyz72WeHMHMeh/hwFo2TeIeIXg480T1VI6mzfDrVp2GzUx0SS0dMsQBjftXkuVR8YOiOwMCAH2a//M1OrvV7d/NBk6kBN0WnuIBb2jKm15PAA7+jQQG7tzwk2HedNH3jeL5GH31xkSRwlBczRK0xsCQXehAlx6cT/e/s44iJcJTHfpPKoSk6UAhPJYe7Z1QnuoawY9P9jQaxpyeImBZxxUEowhjpj2avBxKdRGBVK8R7EL8tSOeLbhdyWe5Mwc1+foEbq9Zz5j5Kd+hn3Wm1UnsGCrXUUUoZp1jnlNl0NakCto+5KmqnT9cHxaY+ix2RLUWAZyVFlRq71OYux1UHJnEJPiEI1/tr4jFBSL46qhQZv/TfpkfVW8FLz0lErfqu0gQEZnNHr3Fc= nicola@p1"
+	defaultTokenAuthUser            = "admin"
+	defaultTokenAuthPass            = "password"
+	altAdminUsername                = "newTestAdmin"
+	altAdminPassword                = "password1"
+	csrfFormToken                   = "_form_token"
+	tokenPath                       = "/api/v2/token"
+	userTokenPath                   = "/api/v2/user/token"
+	userLogoutPath                  = "/api/v2/user/logout"
+	userPath                        = "/api/v2/users"
+	adminPath                       = "/api/v2/admins"
+	adminPwdPath                    = "/api/v2/admin/changepwd"
+	folderPath                      = "/api/v2/folders"
+	activeConnectionsPath           = "/api/v2/connections"
+	serverStatusPath                = "/api/v2/status"
+	quotasBasePath                  = "/api/v2/quotas"
+	quotaScanPath                   = "/api/v2/quotas/users/scans"
+	quotaScanVFolderPath            = "/api/v2/quotas/folders/scans"
+	quotaScanCompatPath             = "/api/v2/quota-scans"
+	quotaScanVFolderCompatPath      = "/api/v2/folder-quota-scans"
+	updateUsedQuotaCompatPath       = "/api/v2/quota-update"
+	updateFolderUsedQuotaCompatPath = "/api/v2/folder-quota-update"
+	defenderHosts                   = "/api/v2/defender/hosts"
+	defenderUnban                   = "/api/v2/defender/unban"
+	versionPath                     = "/api/v2/version"
+	logoutPath                      = "/api/v2/logout"
+	userPwdPath                     = "/api/v2/user/changepwd"
+	userPublicKeysPath              = "/api/v2/user/publickeys"
+	userReadFolderPath              = "/api/v2/user/folder"
+	userGetFilePath                 = "/api/v2/user/file"
+	userStreamZipPath               = "/api/v2/user/streamzip"
+	healthzPath                     = "/healthz"
+	webBasePath                     = "/web"
+	webBasePathAdmin                = "/web/admin"
+	webAdminSetupPath               = "/web/admin/setup"
+	webLoginPath                    = "/web/admin/login"
+	webLogoutPath                   = "/web/admin/logout"
+	webUsersPath                    = "/web/admin/users"
+	webUserPath                     = "/web/admin/user"
+	webFoldersPath                  = "/web/admin/folders"
+	webFolderPath                   = "/web/admin/folder"
+	webConnectionsPath              = "/web/admin/connections"
+	webStatusPath                   = "/web/admin/status"
+	webAdminsPath                   = "/web/admin/managers"
+	webAdminPath                    = "/web/admin/manager"
+	webMaintenancePath              = "/web/admin/maintenance"
+	webRestorePath                  = "/web/admin/restore"
+	webChangeAdminPwdPath           = "/web/admin/changepwd"
+	webTemplateUser                 = "/web/admin/template/user"
+	webTemplateFolder               = "/web/admin/template/folder"
+	webDefenderPath                 = "/web/admin/defender"
+	webBasePathClient               = "/web/client"
+	webClientLoginPath              = "/web/client/login"
+	webClientFilesPath              = "/web/client/files"
+	webClientDirContentsPath        = "/web/client/listdir"
+	webClientDownloadZipPath        = "/web/client/downloadzip"
+	webClientCredentialsPath        = "/web/client/credentials"
+	webChangeClientPwdPath          = "/web/client/changepwd"
+	webChangeClientKeysPath         = "/web/client/managekeys"
+	webClientLogoutPath             = "/web/client/logout"
+	httpBaseURL                     = "http://127.0.0.1:8081"
+	sftpServerAddr                  = "127.0.0.1:8022"
+	configDir                       = ".."
+	httpsCert                       = `-----BEGIN CERTIFICATE-----
 MIICHTCCAaKgAwIBAgIUHnqw7QnB1Bj9oUsNpdb+ZkFPOxMwCgYIKoZIzj0EAwIw
 RTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoMGElu
 dGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yMDAyMDQwOTUzMDRaFw0zMDAyMDEw
@@ -140,6 +155,7 @@ var (
 	testServer         *httptest.Server
 	providerDriverName string
 	postConnectPath    string
+	preDownloadPath    string
 )
 
 type fakeConnection struct {
@@ -195,6 +211,7 @@ func TestMain(m *testing.M) {
 	}
 
 	postConnectPath = filepath.Join(homeBasePath, "postconnect.sh")
+	preDownloadPath = filepath.Join(homeBasePath, "predownload.sh")
 
 	httpConfig := config.GetHTTPConfig()
 	httpConfig.Initialize(configDir) //nolint:errcheck
@@ -284,6 +301,7 @@ func TestMain(m *testing.M) {
 	os.Remove(hostKeyPath)
 	os.Remove(hostKeyPath + ".pub")
 	os.Remove(postConnectPath)
+	os.Remove(preDownloadPath)
 	os.Exit(exitCode)
 }
 
@@ -363,6 +381,182 @@ func TestBasicUserHandling(t *testing.T) {
 	user, _, err = httpdtest.GetUserByUsername(defaultUsername, http.StatusOK)
 	assert.NoError(t, err)
 	_, err = httpdtest.RemoveUser(user, http.StatusOK)
+	assert.NoError(t, err)
+}
+
+func TestHTTPUserAuthentication(t *testing.T) {
+	user, _, err := httpdtest.AddUser(getTestUser(), http.StatusCreated)
+	assert.NoError(t, err)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%v%v", httpBaseURL, userTokenPath), nil)
+	assert.NoError(t, err)
+	req.SetBasicAuth(defaultUsername, defaultPassword)
+	resp, err := httpclient.GetHTTPClient().Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	responseHolder := make(map[string]interface{})
+	err = render.DecodeJSON(resp.Body, &responseHolder)
+	assert.NoError(t, err)
+	userToken := responseHolder["access_token"].(string)
+	assert.NotEmpty(t, userToken)
+	err = resp.Body.Close()
+	assert.NoError(t, err)
+	// login with wrong credentials
+	req, err = http.NewRequest(http.MethodGet, fmt.Sprintf("%v%v", httpBaseURL, userTokenPath), nil)
+	assert.NoError(t, err)
+	req.SetBasicAuth(defaultUsername, "")
+	resp, err = httpclient.GetHTTPClient().Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	err = resp.Body.Close()
+	assert.NoError(t, err)
+
+	req, err = http.NewRequest(http.MethodGet, fmt.Sprintf("%v%v", httpBaseURL, userTokenPath), nil)
+	assert.NoError(t, err)
+	resp, err = httpclient.GetHTTPClient().Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	err = resp.Body.Close()
+	assert.NoError(t, err)
+
+	req, err = http.NewRequest(http.MethodGet, fmt.Sprintf("%v%v", httpBaseURL, userTokenPath), nil)
+	assert.NoError(t, err)
+	req.SetBasicAuth(defaultUsername, "wrong pwd")
+	resp, err = httpclient.GetHTTPClient().Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	respBody, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Contains(t, string(respBody), "invalid credentials")
+	err = resp.Body.Close()
+	assert.NoError(t, err)
+
+	req, err = http.NewRequest(http.MethodGet, fmt.Sprintf("%v%v", httpBaseURL, userTokenPath), nil)
+	assert.NoError(t, err)
+	req.SetBasicAuth("wrong username", defaultPassword)
+	resp, err = httpclient.GetHTTPClient().Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	respBody, err = io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Contains(t, string(respBody), "invalid credentials")
+	err = resp.Body.Close()
+	assert.NoError(t, err)
+
+	req, err = http.NewRequest(http.MethodGet, fmt.Sprintf("%v%v", httpBaseURL, tokenPath), nil)
+	assert.NoError(t, err)
+	req.SetBasicAuth(defaultTokenAuthUser, defaultTokenAuthPass)
+	resp, err = httpclient.GetHTTPClient().Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	responseHolder = make(map[string]interface{})
+	err = render.DecodeJSON(resp.Body, &responseHolder)
+	assert.NoError(t, err)
+	adminToken := responseHolder["access_token"].(string)
+	assert.NotEmpty(t, adminToken)
+	err = resp.Body.Close()
+	assert.NoError(t, err)
+
+	req, err = http.NewRequest(http.MethodGet, fmt.Sprintf("%v%v", httpBaseURL, versionPath), nil)
+	assert.NoError(t, err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", adminToken))
+	resp, err = httpclient.GetHTTPClient().Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	err = resp.Body.Close()
+	assert.NoError(t, err)
+	// using the user token should not work
+	req, err = http.NewRequest(http.MethodGet, fmt.Sprintf("%v%v", httpBaseURL, versionPath), nil)
+	assert.NoError(t, err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", userToken))
+	resp, err = httpclient.GetHTTPClient().Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	err = resp.Body.Close()
+	assert.NoError(t, err)
+
+	req, err = http.NewRequest(http.MethodGet, fmt.Sprintf("%v%v", httpBaseURL, userPublicKeysPath), nil)
+	assert.NoError(t, err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", userToken))
+	resp, err = httpclient.GetHTTPClient().Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	err = resp.Body.Close()
+	assert.NoError(t, err)
+	// using the admin token should not work
+	req, err = http.NewRequest(http.MethodGet, fmt.Sprintf("%v%v", httpBaseURL, userPublicKeysPath), nil)
+	assert.NoError(t, err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", adminToken))
+	resp, err = httpclient.GetHTTPClient().Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	err = resp.Body.Close()
+	assert.NoError(t, err)
+
+	req, err = http.NewRequest(http.MethodGet, fmt.Sprintf("%v%v", httpBaseURL, userLogoutPath), nil)
+	assert.NoError(t, err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", adminToken))
+	resp, err = httpclient.GetHTTPClient().Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	err = resp.Body.Close()
+	assert.NoError(t, err)
+
+	req, err = http.NewRequest(http.MethodGet, fmt.Sprintf("%v%v", httpBaseURL, userLogoutPath), nil)
+	assert.NoError(t, err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", userToken))
+	resp, err = httpclient.GetHTTPClient().Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	err = resp.Body.Close()
+	assert.NoError(t, err)
+
+	req, err = http.NewRequest(http.MethodGet, fmt.Sprintf("%v%v", httpBaseURL, userPublicKeysPath), nil)
+	assert.NoError(t, err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", userToken))
+	resp, err = httpclient.GetHTTPClient().Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	err = resp.Body.Close()
+	assert.NoError(t, err)
+
+	_, err = httpdtest.RemoveUser(user, http.StatusOK)
+	assert.NoError(t, err)
+	err = os.RemoveAll(user.GetHomeDir())
+	assert.NoError(t, err)
+}
+
+func TestHTTPStreamZipError(t *testing.T) {
+	user, _, err := httpdtest.AddUser(getTestUser(), http.StatusCreated)
+	assert.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%v%v", httpBaseURL, userTokenPath), nil)
+	assert.NoError(t, err)
+	req.SetBasicAuth(defaultUsername, defaultPassword)
+	resp, err := httpclient.GetHTTPClient().Do(req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	responseHolder := make(map[string]interface{})
+	err = render.DecodeJSON(resp.Body, &responseHolder)
+	assert.NoError(t, err)
+	userToken := responseHolder["access_token"].(string)
+	assert.NotEmpty(t, userToken)
+	err = resp.Body.Close()
+	assert.NoError(t, err)
+
+	filesList := []string{"missing"}
+	asJSON, err := json.Marshal(filesList)
+	assert.NoError(t, err)
+	req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%v%v", httpBaseURL, userStreamZipPath), bytes.NewBuffer(asJSON))
+	assert.NoError(t, err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", userToken))
+	resp, err = httpclient.GetHTTPClient().Do(req)
+	if !assert.Error(t, err) { // the connection will be closed
+		err = resp.Body.Close()
+		assert.NoError(t, err)
+	}
+	_, err = httpdtest.RemoveUser(user, http.StatusOK)
+	assert.NoError(t, err)
+	err = os.RemoveAll(user.GetHomeDir())
 	assert.NoError(t, err)
 }
 
@@ -645,39 +839,38 @@ func TestAddUserInvalidFilters(t *testing.T) {
 	_, _, err = httpdtest.AddUser(u, http.StatusBadRequest)
 	assert.NoError(t, err)
 	u.Filters.DeniedLoginMethods = []string{}
-	u.Filters.FileExtensions = []dataprovider.ExtensionsFilter{
+	u.Filters.FilePatterns = []dataprovider.PatternsFilter{
 		{
-			Path:              "relative",
-			AllowedExtensions: []string{},
-			DeniedExtensions:  []string{},
+			Path:            "relative",
+			AllowedPatterns: []string{},
+			DeniedPatterns:  []string{},
 		},
 	}
 	_, _, err = httpdtest.AddUser(u, http.StatusBadRequest)
 	assert.NoError(t, err)
-	u.Filters.FileExtensions = []dataprovider.ExtensionsFilter{
+	u.Filters.FilePatterns = []dataprovider.PatternsFilter{
 		{
-			Path:              "/",
-			AllowedExtensions: []string{},
-			DeniedExtensions:  []string{},
+			Path:            "/",
+			AllowedPatterns: []string{},
+			DeniedPatterns:  []string{},
 		},
 	}
 	_, _, err = httpdtest.AddUser(u, http.StatusBadRequest)
 	assert.NoError(t, err)
-	u.Filters.FileExtensions = []dataprovider.ExtensionsFilter{
+	u.Filters.FilePatterns = []dataprovider.PatternsFilter{
 		{
-			Path:              "/subdir",
-			AllowedExtensions: []string{".zip"},
-			DeniedExtensions:  []string{},
+			Path:            "/subdir",
+			AllowedPatterns: []string{"*.zip"},
+			DeniedPatterns:  []string{},
 		},
 		{
-			Path:              "/subdir",
-			AllowedExtensions: []string{".rar"},
-			DeniedExtensions:  []string{".jpg"},
+			Path:            "/subdir",
+			AllowedPatterns: []string{"*.rar"},
+			DeniedPatterns:  []string{"*.jpg"},
 		},
 	}
 	_, _, err = httpdtest.AddUser(u, http.StatusBadRequest)
 	assert.NoError(t, err)
-	u.Filters.FileExtensions = nil
 	u.Filters.FilePatterns = []dataprovider.PatternsFilter{
 		{
 			Path:            "relative",
@@ -791,10 +984,13 @@ func TestAddUserInvalidFsConfig(t *testing.T) {
 
 	u = getTestUser()
 	u.FsConfig.Provider = vfs.AzureBlobFilesystemProvider
-	u.FsConfig.AzBlobConfig.SASURL = "http://foo\x7f.com/"
+	u.FsConfig.AzBlobConfig.SASURL = kms.NewPlainSecret("http://foo\x7f.com/")
 	_, _, err = httpdtest.AddUser(u, http.StatusBadRequest)
 	assert.NoError(t, err)
-	u.FsConfig.AzBlobConfig.SASURL = ""
+	u.FsConfig.AzBlobConfig.SASURL = kms.NewSecret(kms.SecretStatusRedacted, "key", "", "")
+	_, _, err = httpdtest.AddUser(u, http.StatusBadRequest)
+	assert.NoError(t, err)
+	u.FsConfig.AzBlobConfig.SASURL = kms.NewEmptySecret()
 	u.FsConfig.AzBlobConfig.AccountName = "name"
 	_, _, err = httpdtest.AddUser(u, http.StatusBadRequest)
 	assert.NoError(t, err)
@@ -1039,16 +1235,6 @@ func TestAddUserInvalidVirtualFolders(t *testing.T) {
 	// folder name is mandatory
 	_, _, err = httpdtest.AddUser(u, http.StatusBadRequest)
 	assert.NoError(t, err)
-	u.VirtualFolders = nil
-	u.VirtualFolders = append(u.VirtualFolders, vfs.VirtualFolder{
-		BaseVirtualFolder: vfs.BaseVirtualFolder{
-			Name:       "aa=a", // char not allowed
-			MappedPath: filepath.Join(os.TempDir(), "mapped_dir"),
-		},
-		VirtualPath: "/vdir1",
-	})
-	_, _, err = httpdtest.AddUser(u, http.StatusBadRequest)
-	assert.NoError(t, err)
 }
 
 func TestUserPublicKey(t *testing.T) {
@@ -1140,11 +1326,6 @@ func TestUpdateUser(t *testing.T) {
 	user.Filters.Hooks.PreLoginDisabled = true
 	user.Filters.Hooks.CheckPasswordDisabled = false
 	user.Filters.DisableFsChecks = true
-	user.Filters.FileExtensions = append(user.Filters.FileExtensions, dataprovider.ExtensionsFilter{
-		Path:              "/subdir",
-		AllowedExtensions: []string{".zip", ".rar"},
-		DeniedExtensions:  []string{".jpg", ".png"},
-	})
 	user.Filters.FilePatterns = append(user.Filters.FilePatterns, dataprovider.PatternsFilter{
 		Path:            "/subdir",
 		AllowedPatterns: []string{"*.zip", "*.rar"},
@@ -1624,9 +1805,9 @@ func TestUserAzureBlobConfig(t *testing.T) {
 	assert.Equal(t, initialPayload, user.FsConfig.AzBlobConfig.AccountKey.GetPayload())
 	assert.Empty(t, user.FsConfig.AzBlobConfig.AccountKey.GetAdditionalData())
 	assert.Empty(t, user.FsConfig.AzBlobConfig.AccountKey.GetKey())
-	// test user without access key and access secret (sas)
+	// test user without access key and access secret (SAS)
 	user.FsConfig.Provider = vfs.AzureBlobFilesystemProvider
-	user.FsConfig.AzBlobConfig.SASURL = "https://myaccount.blob.core.windows.net/pictures/profile.jpg?sv=2012-02-12&st=2009-02-09&se=2009-02-10&sr=c&sp=r&si=YWJjZGVmZw%3d%3d&sig=dD80ihBh5jfNpymO5Hg1IdiJIEvHcJpCMiCMnN%2fRnbI%3d"
+	user.FsConfig.AzBlobConfig.SASURL = kms.NewPlainSecret("https://myaccount.blob.core.windows.net/pictures/profile.jpg?sv=2012-02-12&st=2009-02-09&se=2009-02-10&sr=c&sp=r&si=YWJjZGVmZw%3d%3d&sig=dD80ihBh5jfNpymO5Hg1IdiJIEvHcJpCMiCMnN%2fRnbI%3d")
 	user.FsConfig.AzBlobConfig.KeyPrefix = "somedir/subdir"
 	user.FsConfig.AzBlobConfig.AccountName = ""
 	user.FsConfig.AzBlobConfig.AccountKey = kms.NewEmptySecret()
@@ -1635,14 +1816,34 @@ func TestUserAzureBlobConfig(t *testing.T) {
 	user, _, err = httpdtest.UpdateUser(user, http.StatusOK, "")
 	assert.NoError(t, err)
 	assert.Nil(t, user.FsConfig.AzBlobConfig.AccountKey)
+	assert.NotNil(t, user.FsConfig.AzBlobConfig.SASURL)
 	_, err = httpdtest.RemoveUser(user, http.StatusOK)
 	assert.NoError(t, err)
 	user.Password = defaultPassword
 	user.ID = 0
 	// sas test for add instead of update
+	user.FsConfig.AzBlobConfig = vfs.AzBlobFsConfig{
+		Container: user.FsConfig.AzBlobConfig.Container,
+		SASURL:    kms.NewPlainSecret("http://127.0.0.1/fake/sass/url"),
+	}
 	user, _, err = httpdtest.AddUser(user, http.StatusCreated)
 	assert.NoError(t, err)
 	assert.Nil(t, user.FsConfig.AzBlobConfig.AccountKey)
+	initialPayload = user.FsConfig.AzBlobConfig.SASURL.GetPayload()
+	assert.Equal(t, kms.SecretStatusSecretBox, user.FsConfig.AzBlobConfig.SASURL.GetStatus())
+	assert.NotEmpty(t, initialPayload)
+	assert.Empty(t, user.FsConfig.AzBlobConfig.SASURL.GetAdditionalData())
+	assert.Empty(t, user.FsConfig.AzBlobConfig.SASURL.GetKey())
+	user.FsConfig.AzBlobConfig.SASURL.SetStatus(kms.SecretStatusSecretBox)
+	user.FsConfig.AzBlobConfig.SASURL.SetAdditionalData("data")
+	user.FsConfig.AzBlobConfig.SASURL.SetKey("fake key")
+	user, _, err = httpdtest.UpdateUser(user, http.StatusOK, "")
+	assert.NoError(t, err)
+	assert.Equal(t, kms.SecretStatusSecretBox, user.FsConfig.AzBlobConfig.SASURL.GetStatus())
+	assert.Equal(t, initialPayload, user.FsConfig.AzBlobConfig.SASURL.GetPayload())
+	assert.Empty(t, user.FsConfig.AzBlobConfig.SASURL.GetAdditionalData())
+	assert.Empty(t, user.FsConfig.AzBlobConfig.SASURL.GetKey())
+
 	_, err = httpdtest.RemoveUser(user, http.StatusOK)
 	assert.NoError(t, err)
 }
@@ -2540,7 +2741,7 @@ func TestCloseActiveConnection(t *testing.T) {
 	_, err := httpdtest.CloseConnection("non_existent_id", http.StatusNotFound)
 	assert.NoError(t, err)
 	user := getTestUser()
-	c := common.NewBaseConnection("connID", common.ProtocolSFTP, user)
+	c := common.NewBaseConnection("connID", common.ProtocolSFTP, "", user)
 	fakeConn := &fakeConnection{
 		BaseConnection: c,
 	}
@@ -2553,12 +2754,12 @@ func TestCloseActiveConnection(t *testing.T) {
 func TestCloseConnectionAfterUserUpdateDelete(t *testing.T) {
 	user, _, err := httpdtest.AddUser(getTestUser(), http.StatusCreated)
 	assert.NoError(t, err)
-	c := common.NewBaseConnection("connID", common.ProtocolFTP, user)
+	c := common.NewBaseConnection("connID", common.ProtocolFTP, "", user)
 	fakeConn := &fakeConnection{
 		BaseConnection: c,
 	}
 	common.Connections.Add(fakeConn)
-	c1 := common.NewBaseConnection("connID1", common.ProtocolSFTP, user)
+	c1 := common.NewBaseConnection("connID1", common.ProtocolSFTP, "", user)
 	fakeConn1 := &fakeConnection{
 		BaseConnection: c1,
 	}
@@ -2769,10 +2970,15 @@ func TestProviderErrors(t *testing.T) {
 	assert.NoError(t, err)
 	err = os.Remove(backupFilePath)
 	assert.NoError(t, err)
-	req, err := http.NewRequest(http.MethodGet, webUserPath+"?clone-from=user", nil)
+	req, err := http.NewRequest(http.MethodGet, webUserPath, nil)
 	assert.NoError(t, err)
 	setJWTCookieForReq(req, testServerToken)
 	rr := executeRequest(req)
+	checkResponseCode(t, http.StatusInternalServerError, rr)
+	req, err = http.NewRequest(http.MethodGet, webUserPath+"?clone-from=user", nil)
+	assert.NoError(t, err)
+	setJWTCookieForReq(req, testServerToken)
+	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusInternalServerError, rr)
 	req, err = http.NewRequest(http.MethodGet, webTemplateUser+"?from=auser", nil)
 	assert.NoError(t, err)
@@ -2966,6 +3172,10 @@ func TestDefenderAPI(t *testing.T) {
 	require.True(t, ok)
 	assert.Nil(t, banTime)
 
+	hosts, _, err := httpdtest.GetDefenderHosts(http.StatusOK)
+	require.NoError(t, err)
+	assert.Len(t, hosts, 0)
+
 	response, _, err = httpdtest.GetScore(ip, http.StatusOK)
 	require.NoError(t, err)
 	score, ok := response["score"]
@@ -2975,6 +3185,9 @@ func TestDefenderAPI(t *testing.T) {
 	err = httpdtest.UnbanIP(ip, http.StatusNotFound)
 	require.NoError(t, err)
 
+	_, err = httpdtest.RemoveDefenderHostByIP(ip, http.StatusNotFound)
+	require.NoError(t, err)
+
 	common.AddDefenderEvent(ip, common.HostEventNoLoginTried)
 	response, _, err = httpdtest.GetScore(ip, http.StatusOK)
 	require.NoError(t, err)
@@ -2982,18 +3195,65 @@ func TestDefenderAPI(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, float64(2), score)
 
+	hosts, _, err = httpdtest.GetDefenderHosts(http.StatusOK)
+	require.NoError(t, err)
+	if assert.Len(t, hosts, 1) {
+		host := hosts[0]
+		assert.Empty(t, host.GetBanTime())
+		assert.Equal(t, 2, host.Score)
+		assert.Equal(t, ip, host.IP)
+	}
+	host, _, err := httpdtest.GetDefenderHostByIP(ip, http.StatusOK)
+	assert.NoError(t, err)
+	assert.Empty(t, host.GetBanTime())
+	assert.Equal(t, 2, host.Score)
+
 	common.AddDefenderEvent(ip, common.HostEventNoLoginTried)
 	response, _, err = httpdtest.GetBanTime(ip, http.StatusOK)
 	require.NoError(t, err)
 	banTime, ok = response["date_time"]
 	require.True(t, ok)
 	assert.NotNil(t, banTime)
+	hosts, _, err = httpdtest.GetDefenderHosts(http.StatusOK)
+	require.NoError(t, err)
+	if assert.Len(t, hosts, 1) {
+		host := hosts[0]
+		assert.NotEmpty(t, host.GetBanTime())
+		assert.Equal(t, 0, host.Score)
+		assert.Equal(t, ip, host.IP)
+	}
+	host, _, err = httpdtest.GetDefenderHostByIP(ip, http.StatusOK)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, host.GetBanTime())
+	assert.Equal(t, 0, host.Score)
 
 	err = httpdtest.UnbanIP(ip, http.StatusOK)
 	require.NoError(t, err)
 
 	err = httpdtest.UnbanIP(ip, http.StatusNotFound)
 	require.NoError(t, err)
+
+	host, _, err = httpdtest.GetDefenderHostByIP(ip, http.StatusNotFound)
+	assert.NoError(t, err)
+
+	common.AddDefenderEvent(ip, common.HostEventNoLoginTried)
+	common.AddDefenderEvent(ip, common.HostEventNoLoginTried)
+	hosts, _, err = httpdtest.GetDefenderHosts(http.StatusOK)
+	require.NoError(t, err)
+	assert.Len(t, hosts, 1)
+
+	_, err = httpdtest.RemoveDefenderHostByIP(ip, http.StatusOK)
+	assert.NoError(t, err)
+
+	host, _, err = httpdtest.GetDefenderHostByIP(ip, http.StatusNotFound)
+	assert.NoError(t, err)
+	_, err = httpdtest.RemoveDefenderHostByIP(ip, http.StatusNotFound)
+	assert.NoError(t, err)
+
+	host, _, err = httpdtest.GetDefenderHostByIP("invalid_ip", http.StatusBadRequest)
+	assert.NoError(t, err)
+	_, err = httpdtest.RemoveDefenderHostByIP("invalid_ip", http.StatusBadRequest)
+	assert.NoError(t, err)
 
 	err = common.Initialize(oldConfig)
 	require.NoError(t, err)
@@ -3231,7 +3491,7 @@ func TestLoaddataMode(t *testing.T) {
 	assert.Equal(t, int64(789), folder.LastQuotaUpdate)
 	assert.Len(t, folder.Users, 0)
 
-	c := common.NewBaseConnection("connID", common.ProtocolFTP, user)
+	c := common.NewBaseConnection("connID", common.ProtocolFTP, "", user)
 	fakeConn := &fakeConnection{
 		BaseConnection: c,
 	}
@@ -3491,6 +3751,50 @@ func TestChangeAdminPwdInvalidJsonMock(t *testing.T) {
 	checkResponseCode(t, http.StatusBadRequest, rr)
 }
 
+func TestWebAPIChangeUserPwdMock(t *testing.T) {
+	user, _, err := httpdtest.AddUser(getTestUser(), http.StatusCreated)
+	assert.NoError(t, err)
+	token, err := getJWTAPIUserTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.NoError(t, err)
+	// invalid json
+	req, err := http.NewRequest(http.MethodPut, userPwdPath, bytes.NewBuffer([]byte("{")))
+	assert.NoError(t, err)
+	setBearerForReq(req, token)
+	rr := executeRequest(req)
+	checkResponseCode(t, http.StatusBadRequest, rr)
+
+	pwd := make(map[string]string)
+	pwd["current_password"] = defaultPassword
+	pwd["new_password"] = defaultPassword
+	asJSON, err := json.Marshal(pwd)
+	assert.NoError(t, err)
+	req, err = http.NewRequest(http.MethodPut, userPwdPath, bytes.NewBuffer(asJSON))
+	assert.NoError(t, err)
+	setBearerForReq(req, token)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusBadRequest, rr)
+	assert.Contains(t, rr.Body.String(), "the new password must be different from the current one")
+
+	pwd["new_password"] = altAdminPassword
+	asJSON, err = json.Marshal(pwd)
+	assert.NoError(t, err)
+	req, err = http.NewRequest(http.MethodPut, userPwdPath, bytes.NewBuffer(asJSON))
+	assert.NoError(t, err)
+	setBearerForReq(req, token)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	_, err = getJWTAPIUserTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.Error(t, err)
+	token, err = getJWTAPIUserTokenFromTestServer(defaultUsername, altAdminPassword)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, token)
+
+	_, err = httpdtest.RemoveUser(user, http.StatusOK)
+	assert.NoError(t, err)
+	err = os.RemoveAll(user.GetHomeDir())
+	assert.NoError(t, err)
+}
+
 func TestLoginInvalidPasswordMock(t *testing.T) {
 	_, err := getJWTAPITokenFromTestServer(defaultTokenAuthUser, defaultTokenAuthPass+"1")
 	assert.Error(t, err)
@@ -3562,6 +3866,8 @@ func TestChangeAdminPwdMock(t *testing.T) {
 func TestUpdateAdminMock(t *testing.T) {
 	token, err := getJWTAPITokenFromTestServer(defaultTokenAuthUser, defaultTokenAuthPass)
 	assert.NoError(t, err)
+	_, err = getJWTAPITokenFromTestServer(altAdminUsername, defaultTokenAuthPass)
+	assert.Error(t, err)
 	admin := getTestAdmin()
 	admin.Username = altAdminUsername
 	admin.Permissions = []string{dataprovider.PermAdminManageAdmins}
@@ -3571,6 +3877,9 @@ func TestUpdateAdminMock(t *testing.T) {
 	setBearerForReq(req, token)
 	rr := executeRequest(req)
 	checkResponseCode(t, http.StatusCreated, rr)
+	_, err = getJWTAPITokenFromTestServer(altAdminUsername, defaultTokenAuthPass)
+	assert.NoError(t, err)
+
 	req, _ = http.NewRequest(http.MethodPut, path.Join(adminPath, "abc"), bytes.NewBuffer(asJSON))
 	setBearerForReq(req, token)
 	rr = executeRequest(req)
@@ -3605,6 +3914,7 @@ func TestUpdateAdminMock(t *testing.T) {
 
 	altToken, err := getJWTAPITokenFromTestServer(altAdminUsername, defaultTokenAuthPass)
 	assert.NoError(t, err)
+	admin.Password = "" // it must remain unchanged
 	admin.Permissions = []string{dataprovider.PermAdminManageAdmins, dataprovider.PermAdminCloseConnections}
 	asJSON, err = json.Marshal(admin)
 	assert.NoError(t, err)
@@ -3612,6 +3922,9 @@ func TestUpdateAdminMock(t *testing.T) {
 	setBearerForReq(req, altToken)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusOK, rr)
+
+	_, err = getJWTAPITokenFromTestServer(altAdminUsername, defaultTokenAuthPass)
+	assert.NoError(t, err)
 
 	req, _ = http.NewRequest(http.MethodDelete, path.Join(adminPath, altAdminUsername), nil)
 	setBearerForReq(req, token)
@@ -3677,7 +3990,11 @@ func TestUpdateUserQuotaUsageMock(t *testing.T) {
 	checkResponseCode(t, http.StatusCreated, rr)
 	err = render.DecodeJSON(rr.Body, &user)
 	assert.NoError(t, err)
-	req, _ = http.NewRequest(http.MethodPut, updateUsedQuotaPath, bytes.NewBuffer(userAsJSON))
+	req, _ = http.NewRequest(http.MethodPut, path.Join(quotasBasePath, "users", u.Username, "usage"), bytes.NewBuffer(userAsJSON))
+	setBearerForReq(req, token)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	req, _ = http.NewRequest(http.MethodPut, updateUsedQuotaCompatPath, bytes.NewBuffer(userAsJSON))
 	setBearerForReq(req, token)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusOK, rr)
@@ -3692,7 +4009,7 @@ func TestUpdateUserQuotaUsageMock(t *testing.T) {
 	// now update only quota size
 	u.UsedQuotaFiles = 0
 	userAsJSON = getUserAsJSON(t, u)
-	req, _ = http.NewRequest(http.MethodPut, updateUsedQuotaPath+"?mode=add", bytes.NewBuffer(userAsJSON))
+	req, _ = http.NewRequest(http.MethodPut, path.Join(quotasBasePath, "users", u.Username, "usage")+"?mode=add", bytes.NewBuffer(userAsJSON))
 	setBearerForReq(req, token)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusOK, rr)
@@ -3708,7 +4025,7 @@ func TestUpdateUserQuotaUsageMock(t *testing.T) {
 	u.UsedQuotaFiles = usedQuotaFiles
 	u.UsedQuotaSize = 0
 	userAsJSON = getUserAsJSON(t, u)
-	req, _ = http.NewRequest(http.MethodPut, updateUsedQuotaPath+"?mode=add", bytes.NewBuffer(userAsJSON))
+	req, _ = http.NewRequest(http.MethodPut, path.Join(quotasBasePath, "users", u.Username, "usage")+"?mode=add", bytes.NewBuffer(userAsJSON))
 	setBearerForReq(req, token)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusOK, rr)
@@ -3720,12 +4037,16 @@ func TestUpdateUserQuotaUsageMock(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, usedQuotaFiles*2, user.UsedQuotaFiles)
 	assert.Equal(t, usedQuotaSize*2, user.UsedQuotaSize)
-	req, _ = http.NewRequest(http.MethodPut, updateUsedQuotaPath, bytes.NewBuffer([]byte("string")))
+	req, _ = http.NewRequest(http.MethodPut, updateUsedQuotaCompatPath, bytes.NewBuffer([]byte("string")))
+	setBearerForReq(req, token)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusBadRequest, rr)
+	req, _ = http.NewRequest(http.MethodPut, path.Join(quotasBasePath, "users", u.Username, "usage"), bytes.NewBuffer([]byte("string")))
 	setBearerForReq(req, token)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusBadRequest, rr)
 	assert.True(t, common.QuotaScans.AddUserQuotaScan(user.Username))
-	req, _ = http.NewRequest(http.MethodPut, updateUsedQuotaPath, bytes.NewBuffer(userAsJSON))
+	req, _ = http.NewRequest(http.MethodPut, path.Join(quotasBasePath, "users", u.Username, "usage"), bytes.NewBuffer(userAsJSON))
 	setBearerForReq(req, token)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusConflict, rr)
@@ -3976,7 +4297,7 @@ func TestDeleteUserInvalidParamsMock(t *testing.T) {
 func TestGetQuotaScansMock(t *testing.T) {
 	token, err := getJWTAPITokenFromTestServer(defaultTokenAuthUser, defaultTokenAuthPass)
 	assert.NoError(t, err)
-	req, err := http.NewRequest("GET", quotaScanPath, nil)
+	req, err := http.NewRequest(http.MethodGet, quotaScanPath, nil)
 	assert.NoError(t, err)
 	setBearerForReq(req, token)
 	rr := executeRequest(req)
@@ -4000,61 +4321,47 @@ func TestStartQuotaScanMock(t *testing.T) {
 		assert.NoError(t, err)
 	}
 	// simulate a duplicate quota scan
-	userAsJSON = getUserAsJSON(t, user)
 	common.QuotaScans.AddUserQuotaScan(user.Username)
-	req, _ = http.NewRequest(http.MethodPost, quotaScanPath, bytes.NewBuffer(userAsJSON))
+	req, _ = http.NewRequest(http.MethodPost, path.Join(quotasBasePath, "users", user.Username, "scan"), nil)
 	setBearerForReq(req, token)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusConflict, rr)
 	assert.True(t, common.QuotaScans.RemoveUserQuotaScan(user.Username))
 
-	userAsJSON = getUserAsJSON(t, user)
-	req, _ = http.NewRequest(http.MethodPost, quotaScanPath, bytes.NewBuffer(userAsJSON))
+	req, _ = http.NewRequest(http.MethodPost, path.Join(quotasBasePath, "users", user.Username, "scan"), nil)
 	setBearerForReq(req, token)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusAccepted, rr)
 
-	for {
-		var scans []common.ActiveQuotaScan
-		req, _ = http.NewRequest(http.MethodGet, quotaScanPath, nil)
-		setBearerForReq(req, token)
-		rr = executeRequest(req)
-		checkResponseCode(t, http.StatusOK, rr)
-		err = render.DecodeJSON(rr.Body, &scans)
-		if !assert.NoError(t, err, "Error getting active scans") {
-			break
-		}
-		if len(scans) == 0 {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+	waitForUsersQuotaScan(t, token)
+
 	_, err = os.Stat(user.HomeDir)
 	if err != nil && os.IsNotExist(err) {
 		err = os.MkdirAll(user.HomeDir, os.ModePerm)
 		assert.NoError(t, err)
 	}
-	req, _ = http.NewRequest(http.MethodPost, quotaScanPath, bytes.NewBuffer(userAsJSON))
+	req, _ = http.NewRequest(http.MethodPost, path.Join(quotasBasePath, "users", user.Username, "scan"), nil)
 	setBearerForReq(req, token)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusAccepted, rr)
 
-	for {
-		var scans []common.ActiveQuotaScan
-		req, _ = http.NewRequest(http.MethodGet, quotaScanPath, nil)
-		setBearerForReq(req, token)
-		rr = executeRequest(req)
-		checkResponseCode(t, http.StatusOK, rr)
-		err = render.DecodeJSON(rr.Body, &scans)
-		if !assert.NoError(t, err) {
-			assert.Fail(t, err.Error(), "Error getting active scans")
-			break
-		}
-		if len(scans) == 0 {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+	waitForUsersQuotaScan(t, token)
+
+	req, _ = http.NewRequest(http.MethodPost, path.Join(quotasBasePath, "users", user.Username, "scan"), nil)
+	setBearerForReq(req, token)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusAccepted, rr)
+
+	waitForUsersQuotaScan(t, token)
+
+	asJSON, err := json.Marshal(user)
+	assert.NoError(t, err)
+	req, _ = http.NewRequest(http.MethodPost, quotaScanCompatPath, bytes.NewBuffer(asJSON))
+	setBearerForReq(req, token)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusAccepted, rr)
+
+	waitForUsersQuotaScan(t, token)
 
 	req, _ = http.NewRequest(http.MethodDelete, path.Join(userPath, user.Username), nil)
 	setBearerForReq(req, token)
@@ -4086,7 +4393,11 @@ func TestUpdateFolderQuotaUsageMock(t *testing.T) {
 	checkResponseCode(t, http.StatusCreated, rr)
 	err = render.DecodeJSON(rr.Body, &folder)
 	assert.NoError(t, err)
-	req, _ = http.NewRequest(http.MethodPut, updateFolderUsedQuotaPath, bytes.NewBuffer(folderAsJSON))
+	req, _ = http.NewRequest(http.MethodPut, path.Join(quotasBasePath, "folders", folder.Name, "usage"), bytes.NewBuffer(folderAsJSON))
+	setBearerForReq(req, token)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	req, _ = http.NewRequest(http.MethodPut, updateFolderUsedQuotaCompatPath, bytes.NewBuffer(folderAsJSON))
 	setBearerForReq(req, token)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusOK, rr)
@@ -4103,7 +4414,8 @@ func TestUpdateFolderQuotaUsageMock(t *testing.T) {
 	f.UsedQuotaFiles = 0
 	folderAsJSON, err = json.Marshal(f)
 	assert.NoError(t, err)
-	req, _ = http.NewRequest(http.MethodPut, updateFolderUsedQuotaPath+"?mode=add", bytes.NewBuffer(folderAsJSON))
+	req, _ = http.NewRequest(http.MethodPut, path.Join(quotasBasePath, "folders", folder.Name, "usage")+"?mode=add",
+		bytes.NewBuffer(folderAsJSON))
 	setBearerForReq(req, token)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusOK, rr)
@@ -4121,7 +4433,8 @@ func TestUpdateFolderQuotaUsageMock(t *testing.T) {
 	f.UsedQuotaFiles = 1
 	folderAsJSON, err = json.Marshal(f)
 	assert.NoError(t, err)
-	req, _ = http.NewRequest(http.MethodPut, updateFolderUsedQuotaPath+"?mode=add", bytes.NewBuffer(folderAsJSON))
+	req, _ = http.NewRequest(http.MethodPut, path.Join(quotasBasePath, "folders", folder.Name, "usage")+"?mode=add",
+		bytes.NewBuffer(folderAsJSON))
 	setBearerForReq(req, token)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusOK, rr)
@@ -4134,13 +4447,19 @@ func TestUpdateFolderQuotaUsageMock(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, usedQuotaFiles*2, folderGet.UsedQuotaFiles)
 	assert.Equal(t, usedQuotaSize*2, folderGet.UsedQuotaSize)
-	req, _ = http.NewRequest(http.MethodPut, updateFolderUsedQuotaPath, bytes.NewBuffer([]byte("string")))
+	req, _ = http.NewRequest(http.MethodPut, updateFolderUsedQuotaCompatPath, bytes.NewBuffer([]byte("string")))
+	setBearerForReq(req, token)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusBadRequest, rr)
+	req, _ = http.NewRequest(http.MethodPut, path.Join(quotasBasePath, "folders", folder.Name, "usage"),
+		bytes.NewBuffer([]byte("not a json")))
 	setBearerForReq(req, token)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusBadRequest, rr)
 
 	assert.True(t, common.QuotaScans.AddVFolderQuotaScan(folderName))
-	req, _ = http.NewRequest(http.MethodPut, updateFolderUsedQuotaPath, bytes.NewBuffer(folderAsJSON))
+	req, _ = http.NewRequest(http.MethodPut, path.Join(quotasBasePath, "folders", folder.Name, "usage"),
+		bytes.NewBuffer(folderAsJSON))
 	setBearerForReq(req, token)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusConflict, rr)
@@ -4174,7 +4493,7 @@ func TestStartFolderQuotaScanMock(t *testing.T) {
 	}
 	// simulate a duplicate quota scan
 	common.QuotaScans.AddVFolderQuotaScan(folderName)
-	req, _ = http.NewRequest(http.MethodPost, quotaScanVFolderPath, bytes.NewBuffer(folderAsJSON))
+	req, _ = http.NewRequest(http.MethodPost, path.Join(quotasBasePath, "folders", folder.Name, "scan"), nil)
 	setBearerForReq(req, token)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusConflict, rr)
@@ -4185,25 +4504,20 @@ func TestStartFolderQuotaScanMock(t *testing.T) {
 		err = os.MkdirAll(mappedPath, os.ModePerm)
 		assert.NoError(t, err)
 	}
-	req, _ = http.NewRequest(http.MethodPost, quotaScanVFolderPath, bytes.NewBuffer(folderAsJSON))
+	req, _ = http.NewRequest(http.MethodPost, path.Join(quotasBasePath, "folders", folder.Name, "scan"), nil)
 	setBearerForReq(req, token)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusAccepted, rr)
-	var scans []common.ActiveVirtualFolderQuotaScan
-	for {
-		req, _ = http.NewRequest(http.MethodGet, quotaScanVFolderPath, nil)
-		setBearerForReq(req, token)
-		rr = executeRequest(req)
-		checkResponseCode(t, http.StatusOK, rr)
-		err = render.DecodeJSON(rr.Body, &scans)
-		if !assert.NoError(t, err, "Error getting active folders scans") {
-			break
-		}
-		if len(scans) == 0 {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+	waitForFoldersQuotaScanPath(t, token)
+
+	asJSON, err := json.Marshal(folder)
+	assert.NoError(t, err)
+	req, _ = http.NewRequest(http.MethodPost, quotaScanVFolderCompatPath, bytes.NewBuffer(asJSON))
+	setBearerForReq(req, token)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusAccepted, rr)
+	waitForFoldersQuotaScanPath(t, token)
+
 	// cleanup
 
 	req, _ = http.NewRequest(http.MethodDelete, path.Join(folderPath, folderName), nil)
@@ -4220,8 +4534,8 @@ func TestStartQuotaScanNonExistentUserMock(t *testing.T) {
 	token, err := getJWTAPITokenFromTestServer(defaultTokenAuthUser, defaultTokenAuthPass)
 	assert.NoError(t, err)
 	user := getTestUser()
-	userAsJSON := getUserAsJSON(t, user)
-	req, _ := http.NewRequest(http.MethodPost, quotaScanPath, bytes.NewBuffer(userAsJSON))
+
+	req, _ := http.NewRequest(http.MethodPost, path.Join(quotasBasePath, "users", user.Username, "scan"), nil)
 	setBearerForReq(req, token)
 	rr := executeRequest(req)
 	checkResponseCode(t, http.StatusNotFound, rr)
@@ -4230,7 +4544,7 @@ func TestStartQuotaScanNonExistentUserMock(t *testing.T) {
 func TestStartQuotaScanBadUserMock(t *testing.T) {
 	token, err := getJWTAPITokenFromTestServer(defaultTokenAuthUser, defaultTokenAuthPass)
 	assert.NoError(t, err)
-	req, _ := http.NewRequest(http.MethodPost, quotaScanPath, bytes.NewBuffer([]byte("invalid json")))
+	req, _ := http.NewRequest(http.MethodPost, quotaScanCompatPath, bytes.NewBuffer([]byte("invalid json")))
 	setBearerForReq(req, token)
 	rr := executeRequest(req)
 	checkResponseCode(t, http.StatusBadRequest, rr)
@@ -4239,7 +4553,7 @@ func TestStartQuotaScanBadUserMock(t *testing.T) {
 func TestStartQuotaScanBadFolderMock(t *testing.T) {
 	token, err := getJWTAPITokenFromTestServer(defaultTokenAuthUser, defaultTokenAuthPass)
 	assert.NoError(t, err)
-	req, _ := http.NewRequest(http.MethodPost, quotaScanVFolderPath, bytes.NewBuffer([]byte("invalid json")))
+	req, _ := http.NewRequest(http.MethodPost, quotaScanVFolderCompatPath, bytes.NewBuffer([]byte("invalid json")))
 	setBearerForReq(req, token)
 	rr := executeRequest(req)
 	checkResponseCode(t, http.StatusBadRequest, rr)
@@ -4252,9 +4566,7 @@ func TestStartQuotaScanNonExistentFolderMock(t *testing.T) {
 		MappedPath: os.TempDir(),
 		Name:       "afolder",
 	}
-	folderAsJSON, err := json.Marshal(folder)
-	assert.NoError(t, err)
-	req, _ := http.NewRequest(http.MethodPost, quotaScanVFolderPath, bytes.NewBuffer(folderAsJSON))
+	req, _ := http.NewRequest(http.MethodPost, path.Join(quotasBasePath, "folders", folder.Name, "scan"), nil)
 	setBearerForReq(req, token)
 	rr := executeRequest(req)
 	checkResponseCode(t, http.StatusNotFound, rr)
@@ -4445,6 +4757,16 @@ func TestLogout(t *testing.T) {
 	assert.Contains(t, rr.Body.String(), "Your token is no longer valid")
 }
 
+func TestDefenderAPIInvalidIDMock(t *testing.T) {
+	token, err := getJWTAPITokenFromTestServer(defaultTokenAuthUser, defaultTokenAuthPass)
+	assert.NoError(t, err)
+	req, _ := http.NewRequest(http.MethodGet, path.Join(defenderHosts, "abc"), nil) // not hex id
+	setBearerForReq(req, token)
+	rr := executeRequest(req)
+	checkResponseCode(t, http.StatusBadRequest, rr)
+	assert.Contains(t, rr.Body.String(), "invalid host id")
+}
+
 func TestTokenHeaderCookie(t *testing.T) {
 	apiToken, err := getJWTAPITokenFromTestServer(defaultTokenAuthUser, defaultTokenAuthPass)
 	assert.NoError(t, err)
@@ -4503,6 +4825,50 @@ func TestTokenAudience(t *testing.T) {
 	assert.Equal(t, webLoginPath, rr.Header().Get("Location"))
 }
 
+func TestWebAPILoginMock(t *testing.T) {
+	_, err := getJWTAPIUserTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.Error(t, err)
+	user, _, err := httpdtest.AddUser(getTestUser(), http.StatusCreated)
+	assert.NoError(t, err)
+	_, err = getJWTAPIUserTokenFromTestServer(defaultUsername+"1", defaultPassword)
+	assert.Error(t, err)
+	_, err = getJWTAPIUserTokenFromTestServer(defaultUsername, defaultPassword+"1")
+	assert.Error(t, err)
+	apiToken, err := getJWTAPIUserTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.NoError(t, err)
+	webToken, err := getJWTWebClientTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.NoError(t, err)
+	// a web token is not valid for API usage
+	req, err := http.NewRequest(http.MethodGet, userReadFolderPath, nil)
+	assert.NoError(t, err)
+	setBearerForReq(req, webToken)
+	rr := executeRequest(req)
+	checkResponseCode(t, http.StatusUnauthorized, rr)
+	assert.Contains(t, rr.Body.String(), "Your token audience is not valid")
+
+	req, err = http.NewRequest(http.MethodGet, userReadFolderPath+"/?path=%2F", nil)
+	assert.NoError(t, err)
+	setBearerForReq(req, apiToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	// API token is not valid for web usage
+	req, _ = http.NewRequest(http.MethodGet, webClientCredentialsPath, nil)
+	setJWTCookieForReq(req, apiToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusFound, rr)
+	assert.Equal(t, webClientLoginPath, rr.Header().Get("Location"))
+
+	req, _ = http.NewRequest(http.MethodGet, webClientCredentialsPath, nil)
+	setJWTCookieForReq(req, webToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+
+	_, err = httpdtest.RemoveUser(user, http.StatusOK)
+	assert.NoError(t, err)
+	err = os.RemoveAll(user.GetHomeDir())
+	assert.NoError(t, err)
+}
+
 func TestWebClientLoginMock(t *testing.T) {
 	_, err := getJWTWebClientTokenFromTestServer(defaultUsername, defaultPassword)
 	assert.Error(t, err)
@@ -4551,6 +4917,8 @@ func TestWebClientLoginMock(t *testing.T) {
 	// get a new token and use it after removing the user
 	webToken, err = getJWTWebClientTokenFromTestServer(defaultUsername, defaultPassword)
 	assert.NoError(t, err)
+	apiUserToken, err := getJWTAPIUserTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.NoError(t, err)
 	_, err = httpdtest.RemoveUser(user, http.StatusOK)
 	assert.NoError(t, err)
 	err = os.RemoveAll(user.GetHomeDir())
@@ -4563,7 +4931,50 @@ func TestWebClientLoginMock(t *testing.T) {
 	req, _ = http.NewRequest(http.MethodGet, webClientFilesPath, nil)
 	setJWTCookieForReq(req, webToken)
 	rr = executeRequest(req)
-	checkResponseCode(t, http.StatusInternalServerError, rr)
+	checkResponseCode(t, http.StatusNotFound, rr)
+	assert.Contains(t, rr.Body.String(), "Unable to retrieve your user")
+
+	req, _ = http.NewRequest(http.MethodGet, webClientDirContentsPath, nil)
+	setJWTCookieForReq(req, webToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusNotFound, rr)
+	assert.Contains(t, rr.Body.String(), "Unable to retrieve your user")
+
+	req, _ = http.NewRequest(http.MethodGet, webClientDownloadZipPath, nil)
+	setJWTCookieForReq(req, webToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusNotFound, rr)
+	assert.Contains(t, rr.Body.String(), "Unable to retrieve your user")
+
+	req, _ = http.NewRequest(http.MethodGet, userReadFolderPath, nil)
+	setBearerForReq(req, apiUserToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusNotFound, rr)
+	assert.Contains(t, rr.Body.String(), "Unable to retrieve your user")
+
+	req, _ = http.NewRequest(http.MethodGet, userGetFilePath, nil)
+	setBearerForReq(req, apiUserToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusNotFound, rr)
+	assert.Contains(t, rr.Body.String(), "Unable to retrieve your user")
+
+	req, _ = http.NewRequest(http.MethodPost, userStreamZipPath, bytes.NewBuffer([]byte(`{}`)))
+	setBearerForReq(req, apiUserToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusNotFound, rr)
+	assert.Contains(t, rr.Body.String(), "Unable to retrieve your user")
+
+	req, _ = http.NewRequest(http.MethodGet, userPublicKeysPath, nil)
+	setBearerForReq(req, apiUserToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusNotFound, rr)
+	assert.Contains(t, rr.Body.String(), "Unable to retrieve your user")
+
+	req, _ = http.NewRequest(http.MethodPut, userPublicKeysPath, bytes.NewBuffer([]byte(`{}`)))
+	setBearerForReq(req, apiUserToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusNotFound, rr)
+	assert.Contains(t, rr.Body.String(), "Unable to retrieve your user")
 
 	csrfToken, err := getCSRFToken(httpBaseURL + webClientLoginPath)
 	assert.NoError(t, err)
@@ -4610,7 +5021,7 @@ func TestWebClientMaxConnections(t *testing.T) {
 	// now add a fake connection
 	fs := vfs.NewOsFs("id", os.TempDir(), "")
 	connection := &httpd.Connection{
-		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolHTTP, user),
+		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolHTTP, "", user),
 	}
 	common.Connections.Add(connection)
 
@@ -4653,6 +5064,7 @@ func TestDefender(t *testing.T) {
 	assert.NoError(t, err)
 	webToken, err := getJWTWebClientTokenFromTestServerWithAddr(defaultUsername, defaultPassword, remoteAddr)
 	assert.NoError(t, err)
+
 	req, _ := http.NewRequest(http.MethodGet, webClientFilesPath, nil)
 	req.RemoteAddr = remoteAddr
 	req.RequestURI = webClientFilesPath
@@ -4709,16 +5121,22 @@ func TestPostConnectHook(t *testing.T) {
 	u := getTestUser()
 	user, _, err := httpdtest.AddUser(u, http.StatusCreated)
 	assert.NoError(t, err)
-	err = os.WriteFile(postConnectPath, getPostConnectScriptContent(0), os.ModePerm)
+	err = os.WriteFile(postConnectPath, getExitCodeScriptContent(0), os.ModePerm)
 	assert.NoError(t, err)
 
 	_, err = getJWTWebClientTokenFromTestServer(defaultUsername, defaultPassword)
 	assert.NoError(t, err)
 
-	err = os.WriteFile(postConnectPath, getPostConnectScriptContent(1), os.ModePerm)
+	_, err = getJWTAPIUserTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.NoError(t, err)
+
+	err = os.WriteFile(postConnectPath, getExitCodeScriptContent(1), os.ModePerm)
 	assert.NoError(t, err)
 
 	_, err = getJWTWebClientTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.Error(t, err)
+
+	_, err = getJWTAPIUserTokenFromTestServer(defaultUsername, defaultPassword)
 	assert.Error(t, err)
 
 	_, err = httpdtest.RemoveUser(user, http.StatusOK)
@@ -4736,13 +5154,17 @@ func TestMaxSessions(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = getJWTWebClientTokenFromTestServer(defaultUsername, defaultPassword)
 	assert.NoError(t, err)
+	_, err = getJWTAPIUserTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.NoError(t, err)
 	// now add a fake connection
 	fs := vfs.NewOsFs("id", os.TempDir(), "")
 	connection := &httpd.Connection{
-		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolHTTP, user),
+		BaseConnection: common.NewBaseConnection(fs.ConnectionID(), common.ProtocolHTTP, "", user),
 	}
 	common.Connections.Add(connection)
 	_, err = getJWTWebClientTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.Error(t, err)
+	_, err = getJWTAPIUserTokenFromTestServer(defaultUsername, defaultPassword)
 	assert.Error(t, err)
 	common.Connections.Remove(connection.GetID())
 	_, err = httpdtest.RemoveUser(user, http.StatusOK)
@@ -4770,6 +5192,9 @@ func TestLoginInvalidFs(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = getJWTWebClientTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.Error(t, err)
+
+	_, err = getJWTAPIUserTokenFromTestServer(defaultUsername, defaultPassword)
 	assert.Error(t, err)
 
 	_, err = httpdtest.RemoveUser(user, http.StatusOK)
@@ -4839,6 +5264,75 @@ func TestWebClientChangePwd(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestWebAPIPublicKeys(t *testing.T) {
+	user, _, err := httpdtest.AddUser(getTestUser(), http.StatusCreated)
+	assert.NoError(t, err)
+	apiToken, err := getJWTAPIUserTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodGet, userPublicKeysPath, nil)
+	assert.NoError(t, err)
+	setBearerForReq(req, apiToken)
+	rr := executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	var keys []string
+	err = json.Unmarshal(rr.Body.Bytes(), &keys)
+	assert.NoError(t, err)
+	assert.Len(t, keys, 0)
+
+	keys = []string{testPubKey, testPubKey1}
+	asJSON, err := json.Marshal(keys)
+	assert.NoError(t, err)
+	req, err = http.NewRequest(http.MethodPut, userPublicKeysPath, bytes.NewBuffer(asJSON))
+	assert.NoError(t, err)
+	setBearerForReq(req, apiToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+
+	req, err = http.NewRequest(http.MethodGet, userPublicKeysPath, nil)
+	assert.NoError(t, err)
+	setBearerForReq(req, apiToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	keys = nil
+	err = json.Unmarshal(rr.Body.Bytes(), &keys)
+	assert.NoError(t, err)
+	assert.Len(t, keys, 2)
+
+	req, err = http.NewRequest(http.MethodPut, userPublicKeysPath, bytes.NewBuffer([]byte(`invalid json`)))
+	assert.NoError(t, err)
+	setBearerForReq(req, apiToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusBadRequest, rr)
+
+	keys = []string{`not a public key`}
+	asJSON, err = json.Marshal(keys)
+	assert.NoError(t, err)
+	req, err = http.NewRequest(http.MethodPut, userPublicKeysPath, bytes.NewBuffer(asJSON))
+	assert.NoError(t, err)
+	setBearerForReq(req, apiToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusBadRequest, rr)
+	assert.Contains(t, rr.Body.String(), "could not parse key")
+
+	user.Filters.WebClient = append(user.Filters.WebClient, dataprovider.WebClientPubKeyChangeDisabled)
+	_, _, err = httpdtest.UpdateUser(user, http.StatusOK, "")
+	assert.NoError(t, err)
+
+	apiToken, err = getJWTAPIUserTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.NoError(t, err)
+	req, err = http.NewRequest(http.MethodGet, userPublicKeysPath, nil)
+	assert.NoError(t, err)
+	setBearerForReq(req, apiToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusForbidden, rr)
+
+	_, err = httpdtest.RemoveUser(user, http.StatusOK)
+	assert.NoError(t, err)
+	err = os.RemoveAll(user.GetHomeDir())
+	assert.NoError(t, err)
+}
+
 func TestWebClientChangePubKeys(t *testing.T) {
 	user, _, err := httpdtest.AddUser(getTestUser(), http.StatusCreated)
 	assert.NoError(t, err)
@@ -4848,6 +5342,7 @@ func TestWebClientChangePubKeys(t *testing.T) {
 	assert.NoError(t, err)
 	form := make(url.Values)
 	form.Set("public_keys", testPubKey)
+	form.Add("public_keys", testPubKey1)
 	// no csrf token
 	req, _ := http.NewRequest(http.MethodPost, webChangeClientKeysPath, bytes.NewBuffer([]byte(form.Encode())))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -4866,7 +5361,7 @@ func TestWebClientChangePubKeys(t *testing.T) {
 
 	user, _, err = httpdtest.GetUserByUsername(user.Username, http.StatusOK)
 	assert.NoError(t, err)
-	assert.Len(t, user.PublicKeys, 1)
+	assert.Len(t, user.PublicKeys, 2)
 
 	form.Set("public_keys", "invalid")
 	req, _ = http.NewRequest(http.MethodPost, webChangeClientKeysPath, bytes.NewBuffer([]byte(form.Encode())))
@@ -4884,6 +5379,7 @@ func TestWebClientChangePubKeys(t *testing.T) {
 	form.Set(csrfFormToken, csrfToken)
 	form.Set("public_keys", testPubKey)
 	req, _ = http.NewRequest(http.MethodPost, webChangeClientKeysPath, bytes.NewBuffer([]byte(form.Encode())))
+	req.RequestURI = webChangeClientKeysPath
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	setJWTCookieForReq(req, webToken)
 	rr = executeRequest(req)
@@ -4895,6 +5391,72 @@ func TestWebClientChangePubKeys(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestPreDownloadHook(t *testing.T) {
+	if runtime.GOOS == osWindows {
+		t.Skip("this test is not available on Windows")
+	}
+	oldExecuteOn := common.Config.Actions.ExecuteOn
+	oldHook := common.Config.Actions.Hook
+
+	common.Config.Actions.ExecuteOn = []string{common.OperationPreDownload}
+	common.Config.Actions.Hook = preDownloadPath
+
+	u := getTestUser()
+	user, _, err := httpdtest.AddUser(u, http.StatusCreated)
+	assert.NoError(t, err)
+	err = os.WriteFile(preDownloadPath, getExitCodeScriptContent(0), os.ModePerm)
+	assert.NoError(t, err)
+
+	testFileName := "testfile"
+	testFileContents := []byte("file contents")
+	err = os.MkdirAll(filepath.Join(user.GetHomeDir()), os.ModePerm)
+	assert.NoError(t, err)
+	err = os.WriteFile(filepath.Join(user.GetHomeDir(), testFileName), testFileContents, os.ModePerm)
+	assert.NoError(t, err)
+
+	webToken, err := getJWTWebClientTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.NoError(t, err)
+	webAPIToken, err := getJWTAPIUserTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.NoError(t, err)
+	req, err := http.NewRequest(http.MethodGet, webClientFilesPath+"?path="+testFileName, nil)
+	assert.NoError(t, err)
+	setJWTCookieForReq(req, webToken)
+	rr := executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	assert.Equal(t, testFileContents, rr.Body.Bytes())
+
+	req, err = http.NewRequest(http.MethodGet, userGetFilePath+"?path="+testFileName, nil)
+	assert.NoError(t, err)
+	setBearerForReq(req, webAPIToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	assert.Equal(t, testFileContents, rr.Body.Bytes())
+
+	err = os.WriteFile(preDownloadPath, getExitCodeScriptContent(1), os.ModePerm)
+	assert.NoError(t, err)
+	req, err = http.NewRequest(http.MethodGet, webClientFilesPath+"?path="+testFileName, nil)
+	assert.NoError(t, err)
+	setJWTCookieForReq(req, webToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	assert.Contains(t, rr.Body.String(), "permission denied")
+
+	req, err = http.NewRequest(http.MethodGet, userGetFilePath+"?path="+testFileName, nil)
+	assert.NoError(t, err)
+	setBearerForReq(req, webAPIToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusForbidden, rr)
+	assert.Contains(t, rr.Body.String(), "permission denied")
+
+	_, err = httpdtest.RemoveUser(user, http.StatusOK)
+	assert.NoError(t, err)
+	err = os.RemoveAll(user.GetHomeDir())
+	assert.NoError(t, err)
+
+	common.Config.Actions.ExecuteOn = oldExecuteOn
+	common.Config.Actions.Hook = oldHook
+}
+
 func TestWebGetFiles(t *testing.T) {
 	user, _, err := httpdtest.AddUser(getTestUser(), http.StatusCreated)
 	assert.NoError(t, err)
@@ -4903,9 +5465,16 @@ func TestWebGetFiles(t *testing.T) {
 	testFileContents := []byte("file contents")
 	err = os.MkdirAll(filepath.Join(user.GetHomeDir(), testDir), os.ModePerm)
 	assert.NoError(t, err)
-	err = os.WriteFile(filepath.Join(user.GetHomeDir(), testFileName), testFileContents, os.ModePerm)
+	extensions := []string{"", ".doc", ".ppt", ".xls", ".pdf", ".mkv", ".png", ".go", ".zip", ".txt"}
+	for _, ext := range extensions {
+		err = os.WriteFile(filepath.Join(user.GetHomeDir(), testFileName+ext), testFileContents, os.ModePerm)
+		assert.NoError(t, err)
+	}
+	err = os.Symlink(filepath.Join(user.GetHomeDir(), testFileName+".doc"), filepath.Join(user.GetHomeDir(), testDir, testFileName+".link"))
 	assert.NoError(t, err)
 	webToken, err := getJWTWebClientTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.NoError(t, err)
+	webAPIToken, err := getJWTAPIUserTokenFromTestServer(defaultUsername, defaultPassword)
 	assert.NoError(t, err)
 	req, _ := http.NewRequest(http.MethodGet, webClientFilesPath, nil)
 	setJWTCookieForReq(req, webToken)
@@ -4917,15 +5486,126 @@ func TestWebGetFiles(t *testing.T) {
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusOK, rr)
 
+	req, _ = http.NewRequest(http.MethodGet, webClientDirContentsPath+"?path="+testDir, nil)
+	setJWTCookieForReq(req, webToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	var dirContents []map[string]string
+	err = json.Unmarshal(rr.Body.Bytes(), &dirContents)
+	assert.NoError(t, err)
+	assert.Len(t, dirContents, 1)
+
+	req, _ = http.NewRequest(http.MethodGet, userReadFolderPath+"?path="+testDir, nil)
+	setBearerForReq(req, webAPIToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	var dirEntries []map[string]interface{}
+	err = json.Unmarshal(rr.Body.Bytes(), &dirEntries)
+	assert.NoError(t, err)
+	assert.Len(t, dirEntries, 1)
+
+	req, _ = http.NewRequest(http.MethodGet, webClientDownloadZipPath+"?path="+url.QueryEscape("/")+"&files="+
+		url.QueryEscape(fmt.Sprintf(`["%v","%v","%v"]`, testFileName, testDir, testFileName+extensions[2])), nil)
+	setJWTCookieForReq(req, webToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+
+	filesList := []string{testFileName, testDir, testFileName + extensions[2]}
+	asJSON, err := json.Marshal(filesList)
+	assert.NoError(t, err)
+	req, _ = http.NewRequest(http.MethodPost, userStreamZipPath, bytes.NewBuffer(asJSON))
+	setBearerForReq(req, webAPIToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+
+	assert.NoError(t, err)
+	req, _ = http.NewRequest(http.MethodPost, userStreamZipPath, bytes.NewBuffer([]byte(`file`)))
+	setBearerForReq(req, webAPIToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusBadRequest, rr)
+
+	req, _ = http.NewRequest(http.MethodGet, webClientDownloadZipPath+"?path="+url.QueryEscape("/")+"&files="+
+		url.QueryEscape(fmt.Sprintf(`["%v"]`, testDir)), nil)
+	setJWTCookieForReq(req, webToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+
+	req, _ = http.NewRequest(http.MethodGet, webClientDownloadZipPath+"?path="+url.QueryEscape("/")+"&files=notalist", nil)
+	setJWTCookieForReq(req, webToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusInternalServerError, rr)
+	assert.Contains(t, rr.Body.String(), "Unable to get files list")
+
+	req, _ = http.NewRequest(http.MethodGet, webClientDirContentsPath+"?path=/", nil)
+	setJWTCookieForReq(req, webToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	dirContents = nil
+	err = json.Unmarshal(rr.Body.Bytes(), &dirContents)
+	assert.NoError(t, err)
+	assert.Len(t, dirContents, len(extensions)+1)
+
+	req, _ = http.NewRequest(http.MethodGet, userReadFolderPath+"?path=/", nil)
+	setBearerForReq(req, webAPIToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	dirEntries = nil
+	err = json.Unmarshal(rr.Body.Bytes(), &dirEntries)
+	assert.NoError(t, err)
+	assert.Len(t, dirEntries, len(extensions)+1)
+
+	req, _ = http.NewRequest(http.MethodGet, webClientDirContentsPath+"?path=/missing", nil)
+	setJWTCookieForReq(req, webToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusNotFound, rr)
+	assert.Contains(t, rr.Body.String(), "Unable to get directory contents")
+
+	req, _ = http.NewRequest(http.MethodGet, userReadFolderPath+"?path=missing", nil)
+	setBearerForReq(req, webAPIToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusNotFound, rr)
+	assert.Contains(t, rr.Body.String(), "Unable to get directory contents")
+
 	req, _ = http.NewRequest(http.MethodGet, webClientFilesPath+"?path="+testFileName, nil)
 	setJWTCookieForReq(req, webToken)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusOK, rr)
 	assert.Equal(t, testFileContents, rr.Body.Bytes())
 
+	req, _ = http.NewRequest(http.MethodGet, userGetFilePath+"?path="+testFileName, nil)
+	setBearerForReq(req, webAPIToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	assert.Equal(t, testFileContents, rr.Body.Bytes())
+
+	req, _ = http.NewRequest(http.MethodGet, userGetFilePath+"?path=", nil)
+	setBearerForReq(req, webAPIToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusBadRequest, rr)
+	assert.Contains(t, rr.Body.String(), "Please set the path to a valid file")
+
+	req, _ = http.NewRequest(http.MethodGet, userGetFilePath+"?path="+testDir, nil)
+	setBearerForReq(req, webAPIToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusBadRequest, rr)
+	assert.Contains(t, rr.Body.String(), "is a directory")
+
+	req, _ = http.NewRequest(http.MethodGet, userGetFilePath+"?path=notafile", nil)
+	setBearerForReq(req, webAPIToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusNotFound, rr)
+	assert.Contains(t, rr.Body.String(), "Unable to stat the requested file")
+
 	req, _ = http.NewRequest(http.MethodGet, webClientFilesPath+"?path="+testFileName, nil)
 	req.Header.Set("Range", "bytes=2-")
 	setJWTCookieForReq(req, webToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusPartialContent, rr)
+	assert.Equal(t, testFileContents[2:], rr.Body.Bytes())
+
+	req, _ = http.NewRequest(http.MethodGet, userGetFilePath+"?path="+testFileName, nil)
+	req.Header.Set("Range", "bytes=2-")
+	setBearerForReq(req, webAPIToken)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusPartialContent, rr)
 	assert.Equal(t, testFileContents[2:], rr.Body.Bytes())
@@ -4946,6 +5626,12 @@ func TestWebGetFiles(t *testing.T) {
 	req, _ = http.NewRequest(http.MethodGet, webClientFilesPath+"?path="+testFileName, nil)
 	req.Header.Set("Range", "bytes=1a-")
 	setJWTCookieForReq(req, webToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusRequestedRangeNotSatisfiable, rr)
+
+	req, _ = http.NewRequest(http.MethodGet, userGetFilePath+"?path="+testFileName, nil)
+	req.Header.Set("Range", "bytes=2b-")
+	setBearerForReq(req, webAPIToken)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusRequestedRangeNotSatisfiable, rr)
 
@@ -4981,6 +5667,12 @@ func TestWebGetFiles(t *testing.T) {
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusPreconditionFailed, rr)
 
+	req, _ = http.NewRequest(http.MethodHead, userGetFilePath+"?path="+testFileName, nil)
+	req.Header.Set("If-Unmodified-Since", time.Now().UTC().Add(-120*time.Second).Format(http.TimeFormat))
+	setBearerForReq(req, webAPIToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusPreconditionFailed, rr)
+
 	req, _ = http.NewRequest(http.MethodHead, webClientFilesPath+"?path="+testFileName, nil)
 	req.Header.Set("If-Unmodified-Since", time.Now().UTC().Add(120*time.Second).Format(http.TimeFormat))
 	setJWTCookieForReq(req, webToken)
@@ -4996,6 +5688,29 @@ func TestWebGetFiles(t *testing.T) {
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusForbidden, rr)
 
+	req, _ = http.NewRequest(http.MethodGet, webClientDirContentsPath+"?path=/", nil)
+	setJWTCookieForReq(req, webToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusForbidden, rr)
+
+	req, _ = http.NewRequest(http.MethodGet, userGetFilePath+"?path="+testFileName, nil)
+	setBearerForReq(req, webAPIToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusForbidden, rr)
+
+	req, _ = http.NewRequest(http.MethodGet, userReadFolderPath+"?path="+testDir, nil)
+	setBearerForReq(req, webAPIToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusForbidden, rr)
+
+	filesList = []string{testDir}
+	asJSON, err = json.Marshal(filesList)
+	assert.NoError(t, err)
+	req, _ = http.NewRequest(http.MethodPost, userStreamZipPath, bytes.NewBuffer(asJSON))
+	setBearerForReq(req, webAPIToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusForbidden, rr)
+
 	user.Filters.DeniedProtocols = []string{common.ProtocolFTP}
 	user.Filters.DeniedLoginMethods = []string{dataprovider.LoginMethodPassword}
 	_, resp, err = httpdtest.UpdateUser(user, http.StatusOK, "")
@@ -5006,10 +5721,42 @@ func TestWebGetFiles(t *testing.T) {
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusForbidden, rr)
 
+	req, _ = http.NewRequest(http.MethodGet, webClientDownloadZipPath, nil)
+	setJWTCookieForReq(req, webToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusForbidden, rr)
+
+	req, _ = http.NewRequest(http.MethodGet, userReadFolderPath+"?path="+testDir, nil)
+	setBearerForReq(req, webAPIToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusForbidden, rr)
+
 	_, err = httpdtest.RemoveUser(user, http.StatusOK)
 	assert.NoError(t, err)
 	err = os.RemoveAll(user.GetHomeDir())
 	assert.NoError(t, err)
+}
+
+func TestCompressionErrorMock(t *testing.T) {
+	user, _, err := httpdtest.AddUser(getTestUser(), http.StatusCreated)
+	assert.NoError(t, err)
+
+	defer func() {
+		rcv := recover()
+		assert.Equal(t, http.ErrAbortHandler, rcv)
+		_, err := httpdtest.RemoveUser(user, http.StatusOK)
+		assert.NoError(t, err)
+		err = os.RemoveAll(user.GetHomeDir())
+		assert.NoError(t, err)
+	}()
+
+	webToken, err := getJWTWebClientTokenFromTestServer(defaultUsername, defaultPassword)
+	assert.NoError(t, err)
+
+	req, _ := http.NewRequest(http.MethodGet, webClientDownloadZipPath+"?path="+url.QueryEscape("/")+"&files="+
+		url.QueryEscape(`["missing"]`), nil)
+	setJWTCookieForReq(req, webToken)
+	executeRequest(req)
 }
 
 func TestGetFilesSFTPBackend(t *testing.T) {
@@ -5527,6 +6274,17 @@ func TestBasicWebUsersMock(t *testing.T) {
 	checkResponseCode(t, http.StatusOK, rr)
 }
 
+func TestRenderDefenderPageMock(t *testing.T) {
+	token, err := getJWTWebTokenFromTestServer(defaultTokenAuthUser, defaultTokenAuthPass)
+	assert.NoError(t, err)
+	req, err := http.NewRequest(http.MethodGet, webDefenderPath, nil)
+	assert.NoError(t, err)
+	setJWTCookieForReq(req, token)
+	rr := executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	assert.Contains(t, rr.Body.String(), "View and manage blocklist")
+}
+
 func TestWebAdminBasicMock(t *testing.T) {
 	token, err := getJWTWebTokenFromTestServer(defaultTokenAuthUser, defaultTokenAuthPass)
 	assert.NoError(t, err)
@@ -5905,12 +6663,28 @@ func TestWebUserAddMock(t *testing.T) {
 	form.Set("status", strconv.Itoa(user.Status))
 	form.Set("expiration_date", "")
 	form.Set("permissions", "*")
-	form.Set("sub_dirs_permissions", " /subdir::list ,download ")
-	form.Set("virtual_folders", fmt.Sprintf(" /vdir:: %v :: 2 :: 1024", folderName))
-	form.Set("allowed_extensions", "/dir2::.jpg,.png\n/dir2::.ico\n/dir1::.rar")
-	form.Set("denied_extensions", "/dir2::.webp,.webp\n/dir2::.tiff\n/dir1::.zip")
-	form.Set("allowed_patterns", "/dir2::*.jpg,*.png\n/dir1::*.png")
-	form.Set("denied_patterns", "/dir1::*.zip\n/dir3::*.rar\n/dir2::*.mkv")
+	form.Set("sub_perm_path0", "/subdir")
+	form.Set("sub_perm_permissions0", "list")
+	form.Add("sub_perm_permissions0", "download")
+	form.Set("vfolder_path", " /vdir")
+	form.Set("vfolder_name", folderName)
+	form.Set("vfolder_quota_size", "1024")
+	form.Set("vfolder_quota_files", "2")
+	form.Set("pattern_path0", "/dir2")
+	form.Set("patterns0", "*.jpg,*.png")
+	form.Set("pattern_type0", "allowed")
+	form.Set("pattern_path1", "/dir1")
+	form.Set("patterns1", "*.png")
+	form.Set("pattern_type1", "allowed")
+	form.Set("pattern_path2", "/dir1")
+	form.Set("patterns2", "*.zip")
+	form.Set("pattern_type2", "denied")
+	form.Set("pattern_path3", "/dir3")
+	form.Set("patterns3", "*.rar")
+	form.Set("pattern_type3", "denied")
+	form.Set("pattern_path4", "/dir2")
+	form.Set("patterns4", "*.mkv")
+	form.Set("pattern_type4", "denied")
 	form.Set("additional_info", user.AdditionalInfo)
 	form.Set("description", user.Description)
 	form.Add("hooks", "external_auth_disabled")
@@ -5923,6 +6697,7 @@ func TestWebUserAddMock(t *testing.T) {
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusOK, rr)
 	form.Set("public_keys", testPubKey)
+	form.Add("public_keys", testPubKey1)
 	form.Set("uid", strconv.FormatInt(int64(user.UID), 10))
 	form.Set("gid", "a")
 	b, contentType, _ = getMultipartFormData(form, "", "")
@@ -6085,6 +6860,7 @@ func TestWebUserAddMock(t *testing.T) {
 	} else {
 		assert.Fail(t, "user permissions must contain /somedir", "actual: %v", newUser.Permissions)
 	}
+	assert.Len(t, newUser.PublicKeys, 2)
 	assert.Len(t, newUser.VirtualFolders, 1)
 	for _, v := range newUser.VirtualFolders {
 		assert.Equal(t, v.VirtualPath, "/vdir")
@@ -6092,24 +6868,6 @@ func TestWebUserAddMock(t *testing.T) {
 		assert.Equal(t, v.MappedPath, mappedDir)
 		assert.Equal(t, v.QuotaFiles, 2)
 		assert.Equal(t, v.QuotaSize, int64(1024))
-	}
-	assert.Len(t, newUser.Filters.FileExtensions, 2)
-	for _, filter := range newUser.Filters.FileExtensions {
-		if filter.Path == "/dir1" {
-			assert.Len(t, filter.DeniedExtensions, 1)
-			assert.Len(t, filter.AllowedExtensions, 1)
-			assert.True(t, utils.IsStringInSlice(".zip", filter.DeniedExtensions))
-			assert.True(t, utils.IsStringInSlice(".rar", filter.AllowedExtensions))
-		}
-		if filter.Path == "/dir2" {
-			assert.Len(t, filter.DeniedExtensions, 2)
-			assert.Len(t, filter.AllowedExtensions, 3)
-			assert.True(t, utils.IsStringInSlice(".jpg", filter.AllowedExtensions))
-			assert.True(t, utils.IsStringInSlice(".png", filter.AllowedExtensions))
-			assert.True(t, utils.IsStringInSlice(".ico", filter.AllowedExtensions))
-			assert.True(t, utils.IsStringInSlice(".webp", filter.DeniedExtensions))
-			assert.True(t, utils.IsStringInSlice(".tiff", filter.DeniedExtensions))
-		}
 	}
 	assert.Len(t, newUser.Filters.FilePatterns, 3)
 	for _, filter := range newUser.Filters.FilePatterns {
@@ -6180,12 +6938,16 @@ func TestWebUserUpdateMock(t *testing.T) {
 	form.Set("upload_bandwidth", "0")
 	form.Set("download_bandwidth", "0")
 	form.Set("permissions", "*")
-	form.Set("sub_dirs_permissions", "/otherdir :: list ,upload ")
+	form.Set("sub_perm_path0", "/otherdir")
+	form.Set("sub_perm_permissions0", "list")
+	form.Add("sub_perm_permissions0", "upload")
 	form.Set("status", strconv.Itoa(user.Status))
 	form.Set("expiration_date", "2020-01-01 00:00:00")
 	form.Set("allowed_ip", " 192.168.1.3/32, 192.168.2.0/24 ")
 	form.Set("denied_ip", " 10.0.0.2/32 ")
-	form.Set("denied_extensions", "/dir1::.zip")
+	form.Set("pattern_path0", "/dir1")
+	form.Set("patterns0", "*.zip")
+	form.Set("pattern_type0", "denied")
 	form.Set("ssh_login_methods", dataprovider.SSHLoginMethodKeyboardInteractive)
 	form.Set("denied_protocols", common.ProtocolFTP)
 	form.Set("max_upload_file_size", "100")
@@ -6267,7 +7029,7 @@ func TestWebUserUpdateMock(t *testing.T) {
 	assert.True(t, utils.IsStringInSlice("10.0.0.2/32", updateUser.Filters.DeniedIP))
 	assert.True(t, utils.IsStringInSlice(dataprovider.SSHLoginMethodKeyboardInteractive, updateUser.Filters.DeniedLoginMethods))
 	assert.True(t, utils.IsStringInSlice(common.ProtocolFTP, updateUser.Filters.DeniedProtocols))
-	assert.True(t, utils.IsStringInSlice(".zip", updateUser.Filters.FileExtensions[0].DeniedExtensions))
+	assert.True(t, utils.IsStringInSlice("*.zip", updateUser.Filters.FilePatterns[0].DeniedPatterns))
 	req, err = http.NewRequest(http.MethodDelete, path.Join(userPath, user.Username), nil)
 	assert.NoError(t, err)
 	setBearerForReq(req, apiToken)
@@ -6381,14 +7143,24 @@ func TestUserTemplateWithFoldersMock(t *testing.T) {
 	form.Set("upload_bandwidth", "0")
 	form.Set("download_bandwidth", "0")
 	form.Set("permissions", "*")
-	form.Set("sub_dirs_permissions", "")
 	form.Set("status", strconv.Itoa(user.Status))
 	form.Set("expiration_date", "2020-01-01 00:00:00")
 	form.Set("fs_provider", "0")
 	form.Set("max_upload_file_size", "0")
 	form.Set("description", "desc %username% %password%")
-	form.Set("virtual_folders", "/vdir%username%::"+folder.Name+"::-1::-1")
-	form.Set("users", "auser1::password1\nauser2::password2::"+testPubKey+"\nauser1::password")
+	form.Set("vfolder_path", "/vdir%username%")
+	form.Set("vfolder_name", folder.Name)
+	form.Set("vfolder_quota_size", "-1")
+	form.Set("vfolder_quota_files", "-1")
+	form.Add("tpl_username", "auser1")
+	form.Add("tpl_password", "password1")
+	form.Add("tpl_public_keys", " ")
+	form.Add("tpl_username", "auser2")
+	form.Add("tpl_password", "password2")
+	form.Add("tpl_public_keys", testPubKey)
+	form.Add("tpl_username", "auser1")
+	form.Add("tpl_password", "password")
+	form.Add("tpl_public_keys", "")
 	b, contentType, _ := getMultipartFormData(form, "", "")
 	req, _ := http.NewRequest(http.MethodPost, path.Join(webTemplateUser), &b)
 	setJWTCookieForReq(req, token)
@@ -6469,7 +7241,6 @@ func TestUserTemplateMock(t *testing.T) {
 	form.Set("upload_bandwidth", "0")
 	form.Set("download_bandwidth", "0")
 	form.Set("permissions", "*")
-	form.Set("sub_dirs_permissions", "")
 	form.Set("status", strconv.Itoa(user.Status))
 	form.Set("expiration_date", "2020-01-01 00:00:00")
 	form.Set("allowed_ip", "")
@@ -6504,7 +7275,9 @@ func TestUserTemplateMock(t *testing.T) {
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusBadRequest, rr)
 
-	form.Set("users", "user1::password1::invalid-pkey")
+	form.Set("tpl_username", "user1")
+	form.Set("tpl_password", "password1")
+	form.Set("tpl_public_keys", "invalid-pkey")
 	b, contentType, _ = getMultipartFormData(form, "", "")
 	req, _ = http.NewRequest(http.MethodPost, webTemplateUser, &b)
 	setJWTCookieForReq(req, token)
@@ -6513,7 +7286,9 @@ func TestUserTemplateMock(t *testing.T) {
 	checkResponseCode(t, http.StatusBadRequest, rr)
 	require.Contains(t, rr.Body.String(), "Error validating user")
 
-	form.Set("users", "user1:password1")
+	form.Set("tpl_username", "user1")
+	form.Set("tpl_password", " ")
+	form.Set("tpl_public_keys", "")
 	b, contentType, _ = getMultipartFormData(form, "", "")
 	req, _ = http.NewRequest(http.MethodPost, webTemplateUser, &b)
 	setJWTCookieForReq(req, token)
@@ -6522,7 +7297,15 @@ func TestUserTemplateMock(t *testing.T) {
 	checkResponseCode(t, http.StatusBadRequest, rr)
 	require.Contains(t, rr.Body.String(), "No valid users found, export is not possible")
 
-	form.Set("users", "user1::password1\nuser2::password2::"+testPubKey+"\nuser3::::")
+	form.Set("tpl_username", "user1")
+	form.Set("tpl_password", "password1")
+	form.Set("tpl_public_keys", " ")
+	form.Add("tpl_username", "user2")
+	form.Add("tpl_password", "password2")
+	form.Add("tpl_public_keys", testPubKey)
+	form.Add("tpl_username", "user3")
+	form.Add("tpl_password", "")
+	form.Add("tpl_public_keys", "")
 	b, contentType, _ = getMultipartFormData(form, "", "")
 	req, _ = http.NewRequest(http.MethodPost, webTemplateUser, &b)
 	setJWTCookieForReq(req, token)
@@ -6578,9 +7361,13 @@ func TestFolderTemplateMock(t *testing.T) {
 	form.Set("name", folderName)
 	form.Set("mapped_path", mappedPath)
 	form.Set("description", "desc folder %name%")
-	form.Set("folders", "folder1\nfolder2\nfolder3\nfolder1\n\n\n")
-	contentType := "application/x-www-form-urlencoded"
-	req, _ := http.NewRequest(http.MethodPost, webTemplateFolder, bytes.NewBuffer([]byte(form.Encode())))
+	form.Add("tpl_foldername", "folder1")
+	form.Add("tpl_foldername", "folder2")
+	form.Add("tpl_foldername", "folder3")
+	form.Add("tpl_foldername", "folder1 ")
+	form.Add("tpl_foldername", " ")
+	b, contentType, _ := getMultipartFormData(form, "", "")
+	req, _ := http.NewRequest(http.MethodPost, webTemplateFolder, &b)
 	setJWTCookieForReq(req, token)
 	req.Header.Set("Content-Type", contentType)
 	rr := executeRequest(req)
@@ -6588,7 +7375,8 @@ func TestFolderTemplateMock(t *testing.T) {
 	assert.Contains(t, rr.Body.String(), "unable to verify form token")
 
 	form.Set(csrfFormToken, csrfToken)
-	req, _ = http.NewRequest(http.MethodPost, webTemplateFolder+"?param=p%C3%AO%GG", bytes.NewBuffer([]byte(form.Encode())))
+	b, contentType, _ = getMultipartFormData(form, "", "")
+	req, _ = http.NewRequest(http.MethodPost, webTemplateFolder+"?param=p%C3%AO%GG", &b)
 	setJWTCookieForReq(req, token)
 	req.Header.Set("Content-Type", contentType)
 	rr = executeRequest(req)
@@ -6598,7 +7386,8 @@ func TestFolderTemplateMock(t *testing.T) {
 	folder1 := "folder1"
 	folder2 := "folder2"
 	folder3 := "folder3"
-	req, _ = http.NewRequest(http.MethodPost, webTemplateFolder, bytes.NewBuffer([]byte(form.Encode())))
+	b, contentType, _ = getMultipartFormData(form, "", "")
+	req, _ = http.NewRequest(http.MethodPost, webTemplateFolder, &b)
 	setJWTCookieForReq(req, token)
 	req.Header.Set("Content-Type", contentType)
 	rr = executeRequest(req)
@@ -6627,7 +7416,8 @@ func TestFolderTemplateMock(t *testing.T) {
 	form.Set("s3_access_secret", "pwd%name%")
 	form.Set("s3_key_prefix", "base/%name%")
 
-	req, _ = http.NewRequest(http.MethodPost, webTemplateFolder, bytes.NewBuffer([]byte(form.Encode())))
+	b, contentType, _ = getMultipartFormData(form, "", "")
+	req, _ = http.NewRequest(http.MethodPost, webTemplateFolder, &b)
 	setJWTCookieForReq(req, token)
 	req.Header.Set("Content-Type", contentType)
 	rr = executeRequest(req)
@@ -6636,7 +7426,8 @@ func TestFolderTemplateMock(t *testing.T) {
 
 	form.Set("s3_upload_part_size", "5")
 	form.Set("s3_upload_concurrency", "4")
-	req, _ = http.NewRequest(http.MethodPost, webTemplateFolder, bytes.NewBuffer([]byte(form.Encode())))
+	b, contentType, _ = getMultipartFormData(form, "", "")
+	req, _ = http.NewRequest(http.MethodPost, webTemplateFolder, &b)
 	setJWTCookieForReq(req, token)
 	req.Header.Set("Content-Type", contentType)
 	rr = executeRequest(req)
@@ -6667,17 +7458,19 @@ func TestFolderTemplateMock(t *testing.T) {
 	require.Equal(t, "pwd"+folder3, dump.Folders[2].FsConfig.S3Config.AccessSecret.GetPayload())
 	require.Equal(t, "base/"+folder3+"/", dump.Folders[2].FsConfig.S3Config.KeyPrefix)
 
-	form.Set("folders", "\n\n\n")
-	req, _ = http.NewRequest(http.MethodPost, webTemplateFolder, bytes.NewBuffer([]byte(form.Encode())))
+	form.Set("tpl_foldername", " ")
+	b, contentType, _ = getMultipartFormData(form, "", "")
+	req, _ = http.NewRequest(http.MethodPost, webTemplateFolder, &b)
 	setJWTCookieForReq(req, token)
 	req.Header.Set("Content-Type", contentType)
 	rr = executeRequest(req)
 	checkResponseCode(t, http.StatusBadRequest, rr)
 	assert.Contains(t, rr.Body.String(), "No folders to export")
 
-	form.Set("folders", "name")
+	form.Set("tpl_foldername", "name")
 	form.Set("mapped_path", "relative-path")
-	req, _ = http.NewRequest(http.MethodPost, webTemplateFolder, bytes.NewBuffer([]byte(form.Encode())))
+	b, contentType, _ = getMultipartFormData(form, "", "")
+	req, _ = http.NewRequest(http.MethodPost, webTemplateFolder, &b)
 	setJWTCookieForReq(req, token)
 	req.Header.Set("Content-Type", contentType)
 	rr = executeRequest(req)
@@ -6724,7 +7517,6 @@ func TestWebUserS3Mock(t *testing.T) {
 	form.Set("upload_bandwidth", "0")
 	form.Set("download_bandwidth", "0")
 	form.Set("permissions", "*")
-	form.Set("sub_dirs_permissions", "")
 	form.Set("status", strconv.Itoa(user.Status))
 	form.Set("expiration_date", "2020-01-01 00:00:00")
 	form.Set("allowed_ip", "")
@@ -6737,8 +7529,12 @@ func TestWebUserS3Mock(t *testing.T) {
 	form.Set("s3_storage_class", user.FsConfig.S3Config.StorageClass)
 	form.Set("s3_endpoint", user.FsConfig.S3Config.Endpoint)
 	form.Set("s3_key_prefix", user.FsConfig.S3Config.KeyPrefix)
-	form.Set("allowed_extensions", "/dir1::.jpg,.png")
-	form.Set("denied_extensions", "/dir2::.zip")
+	form.Set("pattern_path0", "/dir1")
+	form.Set("patterns0", "*.jpg,*.png")
+	form.Set("pattern_type0", "allowed")
+	form.Set("pattern_path1", "/dir2")
+	form.Set("patterns1", "*.zip")
+	form.Set("pattern_type1", "denied")
 	form.Set("max_upload_file_size", "0")
 	form.Set("description", user.Description)
 	form.Add("hooks", "pre_login_disabled")
@@ -6783,7 +7579,7 @@ func TestWebUserS3Mock(t *testing.T) {
 	assert.Equal(t, updateUser.FsConfig.S3Config.KeyPrefix, user.FsConfig.S3Config.KeyPrefix)
 	assert.Equal(t, updateUser.FsConfig.S3Config.UploadPartSize, user.FsConfig.S3Config.UploadPartSize)
 	assert.Equal(t, updateUser.FsConfig.S3Config.UploadConcurrency, user.FsConfig.S3Config.UploadConcurrency)
-	assert.Equal(t, 2, len(updateUser.Filters.FileExtensions))
+	assert.Equal(t, 2, len(updateUser.Filters.FilePatterns))
 	assert.Equal(t, kms.SecretStatusSecretBox, updateUser.FsConfig.S3Config.AccessSecret.GetStatus())
 	assert.NotEmpty(t, updateUser.FsConfig.S3Config.AccessSecret.GetPayload())
 	assert.Empty(t, updateUser.FsConfig.S3Config.AccessSecret.GetKey())
@@ -6873,7 +7669,6 @@ func TestWebUserGCSMock(t *testing.T) {
 	form.Set("upload_bandwidth", "0")
 	form.Set("download_bandwidth", "0")
 	form.Set("permissions", "*")
-	form.Set("sub_dirs_permissions", "")
 	form.Set("status", strconv.Itoa(user.Status))
 	form.Set("expiration_date", "2020-01-01 00:00:00")
 	form.Set("allowed_ip", "")
@@ -6882,7 +7677,9 @@ func TestWebUserGCSMock(t *testing.T) {
 	form.Set("gcs_bucket", user.FsConfig.GCSConfig.Bucket)
 	form.Set("gcs_storage_class", user.FsConfig.GCSConfig.StorageClass)
 	form.Set("gcs_key_prefix", user.FsConfig.GCSConfig.KeyPrefix)
-	form.Set("allowed_extensions", "/dir1::.jpg,.png")
+	form.Set("pattern_path0", "/dir1")
+	form.Set("patterns0", "*.jpg,*.png")
+	form.Set("pattern_type0", "allowed")
 	form.Set("max_upload_file_size", "0")
 	b, contentType, _ := getMultipartFormData(form, "", "")
 	req, _ = http.NewRequest(http.MethodPost, path.Join(webUserPath, user.Username), &b)
@@ -6916,7 +7713,12 @@ func TestWebUserGCSMock(t *testing.T) {
 	assert.Equal(t, user.FsConfig.GCSConfig.Bucket, updateUser.FsConfig.GCSConfig.Bucket)
 	assert.Equal(t, user.FsConfig.GCSConfig.StorageClass, updateUser.FsConfig.GCSConfig.StorageClass)
 	assert.Equal(t, user.FsConfig.GCSConfig.KeyPrefix, updateUser.FsConfig.GCSConfig.KeyPrefix)
-	assert.Equal(t, "/dir1", updateUser.Filters.FileExtensions[0].Path)
+	if assert.Len(t, updateUser.Filters.FilePatterns, 1) {
+		assert.Equal(t, "/dir1", updateUser.Filters.FilePatterns[0].Path)
+		assert.Len(t, updateUser.Filters.FilePatterns[0].AllowedPatterns, 2)
+		assert.Contains(t, updateUser.Filters.FilePatterns[0].AllowedPatterns, "*.png")
+		assert.Contains(t, updateUser.Filters.FilePatterns[0].AllowedPatterns, "*.jpg")
+	}
 	form.Set("gcs_auto_credentials", "on")
 	b, contentType, _ = getMultipartFormData(form, "", "")
 	req, _ = http.NewRequest(http.MethodPost, path.Join(webUserPath, user.Username), &b)
@@ -6939,6 +7741,7 @@ func TestWebUserGCSMock(t *testing.T) {
 	err = os.Remove(credentialsFilePath)
 	assert.NoError(t, err)
 }
+
 func TestWebUserAzureBlobMock(t *testing.T) {
 	webToken, err := getJWTWebTokenFromTestServer(defaultTokenAuthUser, defaultTokenAuthPass)
 	assert.NoError(t, err)
@@ -6976,7 +7779,6 @@ func TestWebUserAzureBlobMock(t *testing.T) {
 	form.Set("upload_bandwidth", "0")
 	form.Set("download_bandwidth", "0")
 	form.Set("permissions", "*")
-	form.Set("sub_dirs_permissions", "")
 	form.Set("status", strconv.Itoa(user.Status))
 	form.Set("expiration_date", "2020-01-01 00:00:00")
 	form.Set("allowed_ip", "")
@@ -6985,12 +7787,15 @@ func TestWebUserAzureBlobMock(t *testing.T) {
 	form.Set("az_container", user.FsConfig.AzBlobConfig.Container)
 	form.Set("az_account_name", user.FsConfig.AzBlobConfig.AccountName)
 	form.Set("az_account_key", user.FsConfig.AzBlobConfig.AccountKey.GetPayload())
-	form.Set("az_sas_url", user.FsConfig.AzBlobConfig.SASURL)
 	form.Set("az_endpoint", user.FsConfig.AzBlobConfig.Endpoint)
 	form.Set("az_key_prefix", user.FsConfig.AzBlobConfig.KeyPrefix)
 	form.Set("az_use_emulator", "checked")
-	form.Set("allowed_extensions", "/dir1::.jpg,.png")
-	form.Set("denied_extensions", "/dir2::.zip")
+	form.Set("pattern_path0", "/dir1")
+	form.Set("patterns0", "*.jpg,*.png")
+	form.Set("pattern_type0", "allowed")
+	form.Set("pattern_path1", "/dir2")
+	form.Set("patterns1", "*.zip")
+	form.Set("pattern_type1", "denied")
 	form.Set("max_upload_file_size", "0")
 	// test invalid az_upload_part_size
 	form.Set("az_upload_part_size", "a")
@@ -7028,11 +7833,10 @@ func TestWebUserAzureBlobMock(t *testing.T) {
 	assert.Equal(t, updateUser.FsConfig.AzBlobConfig.Container, user.FsConfig.AzBlobConfig.Container)
 	assert.Equal(t, updateUser.FsConfig.AzBlobConfig.AccountName, user.FsConfig.AzBlobConfig.AccountName)
 	assert.Equal(t, updateUser.FsConfig.AzBlobConfig.Endpoint, user.FsConfig.AzBlobConfig.Endpoint)
-	assert.Equal(t, updateUser.FsConfig.AzBlobConfig.SASURL, user.FsConfig.AzBlobConfig.SASURL)
 	assert.Equal(t, updateUser.FsConfig.AzBlobConfig.KeyPrefix, user.FsConfig.AzBlobConfig.KeyPrefix)
 	assert.Equal(t, updateUser.FsConfig.AzBlobConfig.UploadPartSize, user.FsConfig.AzBlobConfig.UploadPartSize)
 	assert.Equal(t, updateUser.FsConfig.AzBlobConfig.UploadConcurrency, user.FsConfig.AzBlobConfig.UploadConcurrency)
-	assert.Equal(t, 2, len(updateUser.Filters.FileExtensions))
+	assert.Equal(t, 2, len(updateUser.Filters.FilePatterns))
 	assert.Equal(t, kms.SecretStatusSecretBox, updateUser.FsConfig.AzBlobConfig.AccountKey.GetStatus())
 	assert.NotEmpty(t, updateUser.FsConfig.AzBlobConfig.AccountKey.GetPayload())
 	assert.Empty(t, updateUser.FsConfig.AzBlobConfig.AccountKey.GetKey())
@@ -7056,6 +7860,49 @@ func TestWebUserAzureBlobMock(t *testing.T) {
 	assert.Equal(t, updateUser.FsConfig.AzBlobConfig.AccountKey.GetPayload(), lastUpdatedUser.FsConfig.AzBlobConfig.AccountKey.GetPayload())
 	assert.Empty(t, lastUpdatedUser.FsConfig.AzBlobConfig.AccountKey.GetKey())
 	assert.Empty(t, lastUpdatedUser.FsConfig.AzBlobConfig.AccountKey.GetAdditionalData())
+	// test SAS url
+	user.FsConfig.AzBlobConfig.SASURL = kms.NewPlainSecret("sasurl")
+	form.Set("az_account_name", "")
+	form.Set("az_account_key", "")
+	form.Set("az_container", "")
+	form.Set("az_sas_url", user.FsConfig.AzBlobConfig.SASURL.GetPayload())
+	b, contentType, _ = getMultipartFormData(form, "", "")
+	req, _ = http.NewRequest(http.MethodPost, path.Join(webUserPath, user.Username), &b)
+	setJWTCookieForReq(req, webToken)
+	req.Header.Set("Content-Type", contentType)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusSeeOther, rr)
+	req, _ = http.NewRequest(http.MethodGet, path.Join(userPath, user.Username), nil)
+	setBearerForReq(req, apiToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	updateUser = dataprovider.User{}
+	err = render.DecodeJSON(rr.Body, &updateUser)
+	assert.NoError(t, err)
+	assert.Equal(t, kms.SecretStatusSecretBox, updateUser.FsConfig.AzBlobConfig.SASURL.GetStatus())
+	assert.NotEmpty(t, updateUser.FsConfig.AzBlobConfig.SASURL.GetPayload())
+	assert.Empty(t, updateUser.FsConfig.AzBlobConfig.SASURL.GetKey())
+	assert.Empty(t, updateUser.FsConfig.AzBlobConfig.SASURL.GetAdditionalData())
+	// now check that a redacted sas url is not saved
+	form.Set("az_sas_url", redactedSecret)
+	b, contentType, _ = getMultipartFormData(form, "", "")
+	req, _ = http.NewRequest(http.MethodPost, path.Join(webUserPath, user.Username), &b)
+	setJWTCookieForReq(req, webToken)
+	req.Header.Set("Content-Type", contentType)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusSeeOther, rr)
+	req, _ = http.NewRequest(http.MethodGet, path.Join(userPath, user.Username), nil)
+	setBearerForReq(req, apiToken)
+	rr = executeRequest(req)
+	checkResponseCode(t, http.StatusOK, rr)
+	lastUpdatedUser = dataprovider.User{}
+	err = render.DecodeJSON(rr.Body, &lastUpdatedUser)
+	assert.NoError(t, err)
+	assert.Equal(t, kms.SecretStatusSecretBox, lastUpdatedUser.FsConfig.AzBlobConfig.SASURL.GetStatus())
+	assert.Equal(t, updateUser.FsConfig.AzBlobConfig.SASURL.GetPayload(), lastUpdatedUser.FsConfig.AzBlobConfig.SASURL.GetPayload())
+	assert.Empty(t, lastUpdatedUser.FsConfig.AzBlobConfig.SASURL.GetKey())
+	assert.Empty(t, lastUpdatedUser.FsConfig.AzBlobConfig.SASURL.GetAdditionalData())
+
 	req, _ = http.NewRequest(http.MethodDelete, path.Join(userPath, user.Username), nil)
 	setBearerForReq(req, apiToken)
 	rr = executeRequest(req)
@@ -7092,15 +7939,18 @@ func TestWebUserCryptMock(t *testing.T) {
 	form.Set("upload_bandwidth", "0")
 	form.Set("download_bandwidth", "0")
 	form.Set("permissions", "*")
-	form.Set("sub_dirs_permissions", "")
 	form.Set("status", strconv.Itoa(user.Status))
 	form.Set("expiration_date", "2020-01-01 00:00:00")
 	form.Set("allowed_ip", "")
 	form.Set("denied_ip", "")
 	form.Set("fs_provider", "4")
 	form.Set("crypt_passphrase", "")
-	form.Set("allowed_extensions", "/dir1::.jpg,.png")
-	form.Set("denied_extensions", "/dir2::.zip")
+	form.Set("pattern_path0", "/dir1")
+	form.Set("patterns0", "*.jpg,*.png")
+	form.Set("pattern_type0", "allowed")
+	form.Set("pattern_path1", "/dir2")
+	form.Set("patterns1", "*.zip")
+	form.Set("pattern_type1", "denied")
 	form.Set("max_upload_file_size", "0")
 	// passphrase cannot be empty
 	b, contentType, _ := getMultipartFormData(form, "", "")
@@ -7124,7 +7974,7 @@ func TestWebUserCryptMock(t *testing.T) {
 	err = render.DecodeJSON(rr.Body, &updateUser)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1577836800000), updateUser.ExpirationDate)
-	assert.Equal(t, 2, len(updateUser.Filters.FileExtensions))
+	assert.Equal(t, 2, len(updateUser.Filters.FilePatterns))
 	assert.Equal(t, kms.SecretStatusSecretBox, updateUser.FsConfig.CryptConfig.Passphrase.GetStatus())
 	assert.NotEmpty(t, updateUser.FsConfig.CryptConfig.Passphrase.GetPayload())
 	assert.Empty(t, updateUser.FsConfig.CryptConfig.Passphrase.GetKey())
@@ -7191,15 +8041,18 @@ func TestWebUserSFTPFsMock(t *testing.T) {
 	form.Set("upload_bandwidth", "0")
 	form.Set("download_bandwidth", "0")
 	form.Set("permissions", "*")
-	form.Set("sub_dirs_permissions", "")
 	form.Set("status", strconv.Itoa(user.Status))
 	form.Set("expiration_date", "2020-01-01 00:00:00")
 	form.Set("allowed_ip", "")
 	form.Set("denied_ip", "")
 	form.Set("fs_provider", "5")
 	form.Set("crypt_passphrase", "")
-	form.Set("allowed_extensions", "/dir1::.jpg,.png")
-	form.Set("denied_extensions", "/dir2::.zip")
+	form.Set("pattern_path0", "/dir1")
+	form.Set("patterns0", "*.jpg,*.png")
+	form.Set("pattern_type0", "allowed")
+	form.Set("pattern_path1", "/dir2")
+	form.Set("patterns1", "*.zip")
+	form.Set("pattern_type1", "denied")
 	form.Set("max_upload_file_size", "0")
 	// empty sftpconfig
 	b, contentType, _ := getMultipartFormData(form, "", "")
@@ -7230,7 +8083,7 @@ func TestWebUserSFTPFsMock(t *testing.T) {
 	err = render.DecodeJSON(rr.Body, &updateUser)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1577836800000), updateUser.ExpirationDate)
-	assert.Equal(t, 2, len(updateUser.Filters.FileExtensions))
+	assert.Equal(t, 2, len(updateUser.Filters.FilePatterns))
 	assert.Equal(t, kms.SecretStatusSecretBox, updateUser.FsConfig.SFTPConfig.Password.GetStatus())
 	assert.NotEmpty(t, updateUser.FsConfig.SFTPConfig.Password.GetPayload())
 	assert.Empty(t, updateUser.FsConfig.SFTPConfig.Password.GetKey())
@@ -7773,6 +8626,43 @@ func TestStaticFilesMock(t *testing.T) {
 	checkResponseCode(t, http.StatusOK, rr)
 }
 
+func waitForUsersQuotaScan(t *testing.T, token string) {
+	for {
+		var scans []common.ActiveQuotaScan
+		req, _ := http.NewRequest(http.MethodGet, quotaScanPath, nil)
+		setBearerForReq(req, token)
+		rr := executeRequest(req)
+		checkResponseCode(t, http.StatusOK, rr)
+		err := render.DecodeJSON(rr.Body, &scans)
+
+		if !assert.NoError(t, err, "Error getting active scans") {
+			break
+		}
+		if len(scans) == 0 {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func waitForFoldersQuotaScanPath(t *testing.T, token string) {
+	var scans []common.ActiveVirtualFolderQuotaScan
+	for {
+		req, _ := http.NewRequest(http.MethodGet, quotaScanVFolderPath, nil)
+		setBearerForReq(req, token)
+		rr := executeRequest(req)
+		checkResponseCode(t, http.StatusOK, rr)
+		err := render.DecodeJSON(rr.Body, &scans)
+		if !assert.NoError(t, err, "Error getting active folders scans") {
+			break
+		}
+		if len(scans) == 0 {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
 func waitTCPListening(address string) {
 	for {
 		conn, err := net.Dial("tcp", address)
@@ -7895,11 +8785,26 @@ func setJWTCookieForReq(req *http.Request, jwtToken string) {
 }
 
 func getJWTAPITokenFromTestServer(username, password string) (string, error) {
-	req, _ := http.NewRequest(http.MethodGet, "/api/v2/token", nil)
+	req, _ := http.NewRequest(http.MethodGet, tokenPath, nil)
 	req.SetBasicAuth(username, password)
 	rr := executeRequest(req)
 	if rr.Code != http.StatusOK {
-		return "", fmt.Errorf("unexpected  status code %v", rr)
+		return "", fmt.Errorf("unexpected  status code %v", rr.Code)
+	}
+	responseHolder := make(map[string]interface{})
+	err := render.DecodeJSON(rr.Body, &responseHolder)
+	if err != nil {
+		return "", err
+	}
+	return responseHolder["access_token"].(string), nil
+}
+
+func getJWTAPIUserTokenFromTestServer(username, password string) (string, error) {
+	req, _ := http.NewRequest(http.MethodGet, userTokenPath, nil)
+	req.SetBasicAuth(username, password)
+	rr := executeRequest(req)
+	if rr.Code != http.StatusOK {
+		return "", fmt.Errorf("unexpected  status code %v", rr.Code)
 	}
 	responseHolder := make(map[string]interface{})
 	err := render.DecodeJSON(rr.Body, &responseHolder)
@@ -8011,7 +8916,7 @@ func createTestFile(path string, size int64) error {
 	return os.WriteFile(path, content, os.ModePerm)
 }
 
-func getPostConnectScriptContent(exitCode int) []byte {
+func getExitCodeScriptContent(exitCode int) []byte {
 	content := []byte("#!/bin/sh\n\n")
 	content = append(content, []byte(fmt.Sprintf("exit %v", exitCode))...)
 	return content

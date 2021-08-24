@@ -22,6 +22,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
+	"github.com/klauspost/compress/zip"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwt"
 	"github.com/rs/xid"
@@ -263,6 +264,19 @@ xr5cb9VBRBtB9aOKVfuRhpatAfS2Pzm2Htae9lFn7slGPUmu2hkjDw==
 -----END RSA PRIVATE KEY-----`
 )
 
+type failingWriter struct {
+}
+
+func (r *failingWriter) Write(p []byte) (n int, err error) {
+	return 0, errors.New("write error")
+}
+
+func (r *failingWriter) WriteHeader(statusCode int) {}
+
+func (r *failingWriter) Header() http.Header {
+	return make(http.Header)
+}
+
 func TestShouldBind(t *testing.T) {
 	c := Conf{
 		Bindings: []Binding{
@@ -290,6 +304,18 @@ func TestGetRespStatus(t *testing.T) {
 	err = fmt.Errorf("generic error")
 	respStatus = getRespStatus(err)
 	assert.Equal(t, http.StatusInternalServerError, respStatus)
+}
+
+func TestMappedStatusCode(t *testing.T) {
+	err := os.ErrPermission
+	code := getMappedStatusCode(err)
+	assert.Equal(t, http.StatusForbidden, code)
+	err = os.ErrNotExist
+	code = getMappedStatusCode(err)
+	assert.Equal(t, http.StatusNotFound, code)
+	err = os.ErrClosed
+	code = getMappedStatusCode(err)
+	assert.Equal(t, http.StatusInternalServerError, code)
 }
 
 func TestGCSWebInvalidFormFile(t *testing.T) {
@@ -323,7 +349,7 @@ func TestInvalidToken(t *testing.T) {
 	deleteAdmin(rr, req)
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 
-	adminPwd := adminPwd{
+	adminPwd := pwdChange{
 		CurrentPassword: "old",
 		NewPassword:     "new",
 	}
@@ -337,6 +363,31 @@ func TestInvalidToken(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	adm := getAdminFromToken(req)
 	assert.Empty(t, adm.Username)
+
+	rr = httptest.NewRecorder()
+	readUserFolder(rr, req)
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Contains(t, rr.Body.String(), "Invalid token claims")
+
+	rr = httptest.NewRecorder()
+	getUserFile(rr, req)
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Contains(t, rr.Body.String(), "Invalid token claims")
+
+	rr = httptest.NewRecorder()
+	getUserFilesAsZipStream(rr, req)
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Contains(t, rr.Body.String(), "Invalid token claims")
+
+	rr = httptest.NewRecorder()
+	getUserPublicKeys(rr, req)
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Contains(t, rr.Body.String(), "Invalid token claims")
+
+	rr = httptest.NewRecorder()
+	setUserPublicKeys(rr, req)
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Contains(t, rr.Body.String(), "Invalid token claims")
 }
 
 func TestUpdateWebAdminInvalidClaims(t *testing.T) {
@@ -428,6 +479,16 @@ func TestCreateTokenError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 
 	rr = httptest.NewRecorder()
+	user := dataprovider.User{
+		Username: "u",
+		Password: "pwd",
+	}
+	req, _ = http.NewRequest(http.MethodGet, userTokenPath, nil)
+
+	server.generateAndSendUserToken(rr, req, "", user)
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+
+	rr = httptest.NewRecorder()
 	form := make(url.Values)
 	form.Set("username", admin.Username)
 	form.Set("password", admin.Password)
@@ -478,7 +539,7 @@ func TestCreateTokenError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
 
 	username := "webclientuser"
-	user := dataprovider.User{
+	user = dataprovider.User{
 		Username:    username,
 		Password:    "clientpwd",
 		HomeDir:     filepath.Join(os.TempDir(), username),
@@ -555,11 +616,18 @@ func TestJWTTokenValidation(t *testing.T) {
 	fn.ServeHTTP(rr, req.WithContext(ctx))
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 
-	permClientFn := checkClientPerm(dataprovider.WebClientPubKeyChangeDisabled)
+	permClientFn := checkHTTPUserPerm(dataprovider.WebClientPubKeyChangeDisabled)
 	fn = permClientFn(r)
 	rr = httptest.NewRecorder()
 	req, _ = http.NewRequest(http.MethodPost, webChangeClientKeysPath, nil)
 	req.RequestURI = webChangeClientKeysPath
+	ctx = jwtauth.NewContext(req.Context(), token, errTest)
+	fn.ServeHTTP(rr, req.WithContext(ctx))
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+
+	rr = httptest.NewRecorder()
+	req, _ = http.NewRequest(http.MethodPost, userPublicKeysPath, nil)
+	req.RequestURI = userPublicKeysPath
 	ctx = jwtauth.NewContext(req.Context(), token, errTest)
 	fn.ServeHTTP(rr, req.WithContext(ctx))
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -801,7 +869,7 @@ func TestQuotaScanInvalidFs(t *testing.T) {
 		},
 	}
 	common.QuotaScans.AddUserQuotaScan(user.Username)
-	err := doQuotaScan(user)
+	err := doUserQuotaScan(user)
 	assert.Error(t, err)
 }
 
@@ -1088,6 +1156,119 @@ func TestProxyHeaders(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestRecoverer(t *testing.T) {
+	recoveryPath := "/recovery"
+	b := Binding{
+		Address:         "",
+		Port:            8080,
+		EnableWebAdmin:  true,
+		EnableWebClient: false,
+	}
+	server := newHttpdServer(b, "../static")
+	server.initializeRouter()
+	server.router.Get(recoveryPath, func(w http.ResponseWriter, r *http.Request) {
+		panic("panic")
+	})
+	testServer := httptest.NewServer(server.router)
+	defer testServer.Close()
+
+	req, err := http.NewRequest(http.MethodGet, recoveryPath, nil)
+	assert.NoError(t, err)
+	rr := httptest.NewRecorder()
+	testServer.Config.Handler.ServeHTTP(rr, req)
+	assert.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
+
+	server.router = chi.NewRouter()
+	server.router.Use(recoverer)
+	server.router.Get(recoveryPath, func(w http.ResponseWriter, r *http.Request) {
+		panic("panic")
+	})
+	testServer = httptest.NewServer(server.router)
+	defer testServer.Close()
+
+	req, err = http.NewRequest(http.MethodGet, recoveryPath, nil)
+	assert.NoError(t, err)
+	rr = httptest.NewRecorder()
+	testServer.Config.Handler.ServeHTTP(rr, req)
+	assert.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
+}
+
+func TestCompressorAbortHandler(t *testing.T) {
+	defer func() {
+		rcv := recover()
+		assert.Equal(t, http.ErrAbortHandler, rcv)
+	}()
+
+	connection := &Connection{
+		BaseConnection: common.NewBaseConnection(xid.New().String(), common.ProtocolHTTP, "", dataprovider.User{}),
+		request:        nil,
+	}
+	renderCompressedFiles(&failingWriter{}, connection, "", nil)
+}
+
+func TestZipErrors(t *testing.T) {
+	user := dataprovider.User{
+		HomeDir: filepath.Clean(os.TempDir()),
+	}
+	user.Permissions = make(map[string][]string)
+	user.Permissions["/"] = []string{dataprovider.PermAny}
+	connection := &Connection{
+		BaseConnection: common.NewBaseConnection(xid.New().String(), common.ProtocolHTTP, "", user),
+		request:        nil,
+	}
+
+	testDir := filepath.Join(os.TempDir(), "testDir")
+	err := os.MkdirAll(testDir, os.ModePerm)
+	assert.NoError(t, err)
+
+	wr := zip.NewWriter(&failingWriter{})
+	err = wr.Close()
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "write error")
+	}
+
+	err = addZipEntry(wr, connection, "/"+filepath.Base(testDir), "/")
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "write error")
+	}
+
+	testFilePath := filepath.Join(testDir, "ziptest.zip")
+	err = os.WriteFile(testFilePath, utils.GenerateRandomBytes(65535), os.ModePerm)
+	assert.NoError(t, err)
+	err = addZipEntry(wr, connection, path.Join("/", filepath.Base(testDir), filepath.Base(testFilePath)),
+		"/"+filepath.Base(testDir))
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "write error")
+	}
+
+	connection.User.Permissions["/"] = []string{dataprovider.PermListItems}
+	err = addZipEntry(wr, connection, path.Join("/", filepath.Base(testDir), filepath.Base(testFilePath)),
+		"/"+filepath.Base(testDir))
+	assert.ErrorIs(t, err, os.ErrPermission)
+
+	// creating a virtual folder to a missing path stat is ok but readdir fails
+	user.VirtualFolders = append(user.VirtualFolders, vfs.VirtualFolder{
+		BaseVirtualFolder: vfs.BaseVirtualFolder{
+			MappedPath: filepath.Join(os.TempDir(), "mapped"),
+		},
+		VirtualPath: "/vpath",
+	})
+	connection.User = user
+	wr = zip.NewWriter(bytes.NewBuffer(make([]byte, 0)))
+	err = addZipEntry(wr, connection, user.VirtualFolders[0].VirtualPath, "/")
+	assert.Error(t, err)
+
+	user.Filters.FilePatterns = append(user.Filters.FilePatterns, dataprovider.PatternsFilter{
+		Path:           "/",
+		DeniedPatterns: []string{"*.zip"},
+	})
+	err = addZipEntry(wr, connection, "/"+filepath.Base(testDir), "/")
+	assert.ErrorIs(t, err, os.ErrPermission)
+
+	err = os.RemoveAll(testDir)
+	assert.NoError(t, err)
+}
+
 func TestWebAdminRedirect(t *testing.T) {
 	b := Binding{
 		Address:         "",
@@ -1244,37 +1425,18 @@ func TestConnection(t *testing.T) {
 	user.Permissions = make(map[string][]string)
 	user.Permissions["/"] = []string{dataprovider.PermAny}
 	connection := &Connection{
-		BaseConnection: common.NewBaseConnection(xid.New().String(), common.ProtocolHTTP, user),
+		BaseConnection: common.NewBaseConnection(xid.New().String(), common.ProtocolHTTP, "", user),
 		request:        nil,
 	}
 	assert.Empty(t, connection.GetClientVersion())
 	assert.Empty(t, connection.GetRemoteAddress())
 	assert.Empty(t, connection.GetCommand())
 	name := "missing file name"
-	_, err := connection.getFileReader(name, 0)
+	_, err := connection.getFileReader(name, 0, http.MethodGet)
 	assert.Error(t, err)
 	connection.User.FsConfig.Provider = vfs.LocalFilesystemProvider
-	_, err = connection.getFileReader(name, 0)
+	_, err = connection.getFileReader(name, 0, http.MethodGet)
 	assert.ErrorIs(t, err, os.ErrNotExist)
-}
-
-func TestRenderDirError(t *testing.T) {
-	user := dataprovider.User{
-		Username: "test_httpd_user",
-		HomeDir:  filepath.Clean(os.TempDir()),
-	}
-	user.Permissions = make(map[string][]string)
-	user.Permissions["/"] = []string{dataprovider.PermAny}
-	connection := &Connection{
-		BaseConnection: common.NewBaseConnection(xid.New().String(), common.ProtocolHTTP, user),
-		request:        nil,
-	}
-
-	rr := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, webClientFilesPath, nil)
-	renderDirContents(rr, req, connection, "missing dir")
-	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Contains(t, rr.Body.String(), "text-form-error")
 }
 
 func TestHTTPDFile(t *testing.T) {
@@ -1285,7 +1447,7 @@ func TestHTTPDFile(t *testing.T) {
 	user.Permissions = make(map[string][]string)
 	user.Permissions["/"] = []string{dataprovider.PermAny}
 	connection := &Connection{
-		BaseConnection: common.NewBaseConnection(xid.New().String(), common.ProtocolHTTP, user),
+		BaseConnection: common.NewBaseConnection(xid.New().String(), common.ProtocolHTTP, "", user),
 		request:        nil,
 	}
 
@@ -1301,7 +1463,7 @@ func TestHTTPDFile(t *testing.T) {
 	err = file.Close()
 	assert.NoError(t, err)
 
-	baseTransfer := common.NewBaseTransfer(file, connection.BaseConnection, nil, p, name, common.TransferDownload,
+	baseTransfer := common.NewBaseTransfer(file, connection.BaseConnection, nil, p, p, name, common.TransferDownload,
 		0, 0, 0, false, fs)
 	httpdFile := newHTTPDFile(baseTransfer, nil)
 	// the file is closed, read should fail
@@ -1312,6 +1474,8 @@ func TestHTTPDFile(t *testing.T) {
 	assert.Error(t, err)
 	err = httpdFile.Close()
 	assert.ErrorIs(t, err, common.ErrTransferClosed)
+	err = os.Remove(p)
+	assert.NoError(t, err)
 }
 
 func TestChangeUserPwd(t *testing.T) {
@@ -1350,6 +1514,20 @@ func TestGetFilesInvalidClaims(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, webClientFilesPath, nil)
 	req.Header.Set("Cookie", fmt.Sprintf("jwt=%v", token["access_token"]))
 	handleClientGetFiles(rr, req)
+	assert.Equal(t, http.StatusForbidden, rr.Code)
+	assert.Contains(t, rr.Body.String(), "Invalid token claims")
+
+	rr = httptest.NewRecorder()
+	req, _ = http.NewRequest(http.MethodGet, webClientDirContentsPath, nil)
+	req.Header.Set("Cookie", fmt.Sprintf("jwt=%v", token["access_token"]))
+	handleClientGetDirContents(rr, req)
+	assert.Equal(t, http.StatusForbidden, rr.Code)
+	assert.Contains(t, rr.Body.String(), "invalid token claims")
+
+	rr = httptest.NewRecorder()
+	req, _ = http.NewRequest(http.MethodGet, webClientDownloadZipPath, nil)
+	req.Header.Set("Cookie", fmt.Sprintf("jwt=%v", token["access_token"]))
+	handleWebClientDownloadZip(rr, req)
 	assert.Equal(t, http.StatusForbidden, rr.Code)
 	assert.Contains(t, rr.Body.String(), "Invalid token claims")
 }

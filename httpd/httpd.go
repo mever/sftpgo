@@ -1,7 +1,6 @@
 // Package httpd implements REST API and Web interface for SFTPGo.
 // The OpenAPI 3 schema for the exposed API can be found inside the source tree:
 // https://github.com/drakkan/sftpgo/blob/main/httpd/schema/openapi.yaml
-// A basic Web interface to manage users and connections is provided too
 package httpd
 
 import (
@@ -33,7 +32,10 @@ const (
 	logSender                       = "httpd"
 	tokenPath                       = "/api/v2/token"
 	logoutPath                      = "/api/v2/logout"
+	userTokenPath                   = "/api/v2/user/token"
+	userLogoutPath                  = "/api/v2/user/logout"
 	activeConnectionsPath           = "/api/v2/connections"
+	quotasBasePath                  = "/api/v2/quotas"
 	quotaScanPath                   = "/api/v2/quota-scans"
 	quotaScanVFolderPath            = "/api/v2/folder-quota-scans"
 	userPath                        = "/api/v2/users"
@@ -44,11 +46,18 @@ const (
 	loadDataPath                    = "/api/v2/loaddata"
 	updateUsedQuotaPath             = "/api/v2/quota-update"
 	updateFolderUsedQuotaPath       = "/api/v2/folder-quota-update"
+	defenderHosts                   = "/api/v2/defender/hosts"
 	defenderBanTime                 = "/api/v2/defender/bantime"
 	defenderUnban                   = "/api/v2/defender/unban"
 	defenderScore                   = "/api/v2/defender/score"
 	adminPath                       = "/api/v2/admins"
-	adminPwdPath                    = "/api/v2/changepwd/admin"
+	adminPwdPath                    = "/api/v2/admin/changepwd"
+	adminPwdCompatPath              = "/api/v2/changepwd/admin"
+	userPwdPath                     = "/api/v2/user/changepwd"
+	userPublicKeysPath              = "/api/v2/user/publickeys"
+	userReadFolderPath              = "/api/v2/user/folder"
+	userGetFilePath                 = "/api/v2/user/file"
+	userStreamZipPath               = "/api/v2/user/streamzip"
 	healthzPath                     = "/healthz"
 	webRootPathDefault              = "/"
 	webBasePathDefault              = "/web"
@@ -68,13 +77,17 @@ const (
 	webMaintenancePathDefault       = "/web/admin/maintenance"
 	webBackupPathDefault            = "/web/admin/backup"
 	webRestorePathDefault           = "/web/admin/restore"
-	webScanVFolderPathDefault       = "/web/admin/folder-quota-scans"
-	webQuotaScanPathDefault         = "/web/admin/quota-scans"
+	webScanVFolderPathDefault       = "/web/admin/quotas/scanfolder"
+	webQuotaScanPathDefault         = "/web/admin/quotas/scanuser"
 	webChangeAdminPwdPathDefault    = "/web/admin/changepwd"
 	webTemplateUserDefault          = "/web/admin/template/user"
 	webTemplateFolderDefault        = "/web/admin/template/folder"
+	webDefenderPathDefault          = "/web/admin/defender"
+	webDefenderHostsPathDefault     = "/web/admin/defender/hosts"
 	webClientLoginPathDefault       = "/web/client/login"
 	webClientFilesPathDefault       = "/web/client/files"
+	webClientDirContentsPathDefault = "/web/client/listdir"
+	webClientDownloadZipPathDefault = "/web/client/downloadzip"
 	webClientCredentialsPathDefault = "/web/client/credentials"
 	webChangeClientPwdPathDefault   = "/web/client/changepwd"
 	webChangeClientKeysPathDefault  = "/web/client/managekeys"
@@ -117,8 +130,12 @@ var (
 	webChangeAdminPwdPath    string
 	webTemplateUser          string
 	webTemplateFolder        string
+	webDefenderPath          string
+	webDefenderHostsPath     string
 	webClientLoginPath       string
 	webClientFilesPath       string
+	webClientDirContentsPath string
+	webClientDownloadZipPath string
 	webClientCredentialsPath string
 	webChangeClientPwdPath   string
 	webChangeClientKeysPath  string
@@ -413,6 +430,8 @@ func updateWebClientURLs(baseURL string) {
 	webBaseClientPath = path.Join(baseURL, webBasePathClientDefault)
 	webClientLoginPath = path.Join(baseURL, webClientLoginPathDefault)
 	webClientFilesPath = path.Join(baseURL, webClientFilesPathDefault)
+	webClientDirContentsPath = path.Join(baseURL, webClientDirContentsPathDefault)
+	webClientDownloadZipPath = path.Join(baseURL, webClientDownloadZipPathDefault)
 	webClientCredentialsPath = path.Join(baseURL, webClientCredentialsPathDefault)
 	webChangeClientPwdPath = path.Join(baseURL, webChangeClientPwdPathDefault)
 	webChangeClientKeysPath = path.Join(baseURL, webChangeClientKeysPathDefault)
@@ -445,6 +464,8 @@ func updateWebAdminURLs(baseURL string) {
 	webChangeAdminPwdPath = path.Join(baseURL, webChangeAdminPwdPathDefault)
 	webTemplateUser = path.Join(baseURL, webTemplateUserDefault)
 	webTemplateFolder = path.Join(baseURL, webTemplateFolderDefault)
+	webDefenderHostsPath = path.Join(baseURL, webDefenderHostsPathDefault)
+	webDefenderPath = path.Join(baseURL, webDefenderPathDefault)
 	webStaticFilesPath = path.Join(baseURL, webStaticFilesPathDefault)
 }
 

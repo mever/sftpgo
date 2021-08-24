@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/eikenb/pipeat"
+	fscopy "github.com/otiai10/copy"
 	"github.com/pkg/sftp"
 	"github.com/rs/xid"
 
@@ -21,6 +22,14 @@ const (
 	// osFsName is the name for the local Fs implementation
 	osFsName = "osfs"
 )
+
+type pathResolutionError struct {
+	err string
+}
+
+func (e *pathResolutionError) Error() string {
+	return fmt.Sprintf("Path resolution error: %s", e.err)
+}
 
 // OsFs is a Fs implementation that uses functions provided by the os package.
 type OsFs struct {
@@ -90,8 +99,23 @@ func (*OsFs) Create(name string, flag int) (File, *PipeWriter, func(), error) {
 }
 
 // Rename renames (moves) source to target
-func (*OsFs) Rename(source, target string) error {
-	return os.Rename(source, target)
+func (fs *OsFs) Rename(source, target string) error {
+	err := os.Rename(source, target)
+	if err != nil && isCrossDeviceError(err) {
+		fsLog(fs, logger.LevelWarn, "cross device error detected while renaming %#v -> %#v. Trying a copy and remove, this could take a long time",
+			source, target)
+		err = fscopy.Copy(source, target, fscopy.Options{
+			OnSymlink: func(src string) fscopy.SymlinkAction {
+				return fscopy.Skip
+			},
+		})
+		if err != nil {
+			fsLog(fs, logger.LevelDebug, "cross device copy error: %v", err)
+			return err
+		}
+		return os.RemoveAll(source)
+	}
+	return err
 }
 
 // Remove removes the named file or (empty) directory.
@@ -180,6 +204,10 @@ func (*OsFs) IsNotExist(err error) bool {
 // IsPermission returns a boolean indicating whether the error is known to
 // report that permission is denied.
 func (*OsFs) IsPermission(err error) bool {
+	if _, ok := err.(*pathResolutionError); ok {
+		return true
+	}
+
 	return os.IsPermission(err)
 }
 
@@ -214,6 +242,9 @@ func (fs *OsFs) ScanRootDirContents() (int, int64, error) {
 // GetAtomicUploadPath returns the path to use for an atomic upload
 func (*OsFs) GetAtomicUploadPath(name string) string {
 	dir := filepath.Dir(name)
+	if tempPath != "" {
+		dir = tempPath
+	}
 	guid := xid.New().String()
 	return filepath.Join(dir, ".sftpgo-upload."+guid+"."+filepath.Base(name))
 }
@@ -367,7 +398,7 @@ func (fs *OsFs) isSubDir(sub string) error {
 	}
 	if len(sub) < len(parent) {
 		err = fmt.Errorf("path %#v is not inside %#v", sub, parent)
-		return err
+		return &pathResolutionError{err: err.Error()}
 	}
 	separator := string(os.PathSeparator)
 	if parent == filepath.Dir(parent) {
@@ -377,7 +408,7 @@ func (fs *OsFs) isSubDir(sub string) error {
 	}
 	if !strings.HasPrefix(sub, parent+separator) {
 		err = fmt.Errorf("path %#v is not inside %#v", sub, parent)
-		return err
+		return &pathResolutionError{err: err.Error()}
 	}
 	return nil
 }

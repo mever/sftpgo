@@ -85,26 +85,15 @@ var (
 	errNoMatchingVirtualFolder = errors.New("no matching virtual folder found")
 )
 
-// ExtensionsFilter defines filters based on file extensions.
-// These restrictions do not apply to files listing for performance reasons, so
-// a denied file cannot be downloaded/overwritten/renamed but will still be
-// in the list of files.
-// System commands such as Git and rsync interacts with the filesystem directly
-// and they are not aware about these restrictions so they are not allowed
-// inside paths with extensions filters
-type ExtensionsFilter struct {
-	// Virtual path, if no other specific filter is defined, the filter apply for
-	// sub directories too.
-	// For example if filters are defined for the paths "/" and "/sub" then the
-	// filters for "/" are applied for any file outside the "/sub" directory
-	Path string `json:"path"`
-	// only files with these, case insensitive, extensions are allowed.
-	// Shell like expansion is not supported so you have to specify ".jpg" and
-	// not "*.jpg". If you want shell like patterns use pattern filters
-	AllowedExtensions []string `json:"allowed_extensions,omitempty"`
-	// files with these, case insensitive, extensions are not allowed.
-	// Denied file extensions are evaluated before the allowed ones
-	DeniedExtensions []string `json:"denied_extensions,omitempty"`
+// DirectoryPermissions defines permissions for a directory path
+type DirectoryPermissions struct {
+	Path        string
+	Permissions []string
+}
+
+// HasPerm returns true if the directory has the specified permissions
+func (d *DirectoryPermissions) HasPerm(perm string) bool {
+	return utils.IsStringInSlice(perm, d.Permissions)
 }
 
 // PatternsFilter defines filters based on shell like patterns.
@@ -126,6 +115,24 @@ type PatternsFilter struct {
 	// files with these, case insensitive, patterns are not allowed.
 	// Denied file patterns are evaluated before the allowed ones
 	DeniedPatterns []string `json:"denied_patterns,omitempty"`
+}
+
+// GetCommaSeparatedPatterns returns the first non empty patterns list comma separated
+func (p *PatternsFilter) GetCommaSeparatedPatterns() string {
+	if len(p.DeniedPatterns) > 0 {
+		return strings.Join(p.DeniedPatterns, ",")
+	}
+	return strings.Join(p.AllowedPatterns, ",")
+}
+
+// IsDenied returns true if the patterns has one or more denied patterns
+func (p *PatternsFilter) IsDenied() bool {
+	return len(p.DeniedPatterns) > 0
+}
+
+// IsAllowed returns true if the patterns has one or more allowed patterns
+func (p *PatternsFilter) IsAllowed() bool {
+	return len(p.AllowedPatterns) > 0
 }
 
 // HooksFilter defines user specific overrides for global hooks
@@ -151,10 +158,8 @@ type UserFilters struct {
 	// these protocols are not allowed.
 	// If null or empty any available protocol is allowed
 	DeniedProtocols []string `json:"denied_protocols,omitempty"`
-	// filters based on file extensions.
+	// filter based on shell patterns.
 	// Please note that these restrictions can be easily bypassed.
-	FileExtensions []ExtensionsFilter `json:"file_extensions,omitempty"`
-	// filter based on shell patterns
 	FilePatterns []PatternsFilter `json:"file_patterns,omitempty"`
 	// max size allowed for a single upload, 0 means unlimited
 	MaxUploadFileSize int64 `json:"max_upload_file_size,omitempty"`
@@ -346,12 +351,29 @@ func (u *User) hideConfidentialData() {
 		u.FsConfig.GCSConfig.Credentials.Hide()
 	case vfs.AzureBlobFilesystemProvider:
 		u.FsConfig.AzBlobConfig.AccountKey.Hide()
+		u.FsConfig.AzBlobConfig.SASURL.Hide()
 	case vfs.CryptedFilesystemProvider:
 		u.FsConfig.CryptConfig.Passphrase.Hide()
 	case vfs.SFTPFilesystemProvider:
 		u.FsConfig.SFTPConfig.Password.Hide()
 		u.FsConfig.SFTPConfig.PrivateKey.Hide()
 	}
+}
+
+// GetSubDirPermissions returns permissions for sub directories
+func (u *User) GetSubDirPermissions() []DirectoryPermissions {
+	var result []DirectoryPermissions
+	for k, v := range u.Permissions {
+		if k == "/" {
+			continue
+		}
+		dirPerms := DirectoryPermissions{
+			Path:        k,
+			Permissions: v,
+		}
+		result = append(result, dirPerms)
+	}
+	return result
 }
 
 // PrepareForRendering prepares a user for rendering.
@@ -378,6 +400,9 @@ func (u *User) hasRedactedSecret() bool {
 		}
 	case vfs.AzureBlobFilesystemProvider:
 		if u.FsConfig.AzBlobConfig.AccountKey.IsRedacted() {
+			return true
+		}
+		if u.FsConfig.AzBlobConfig.SASURL.IsRedacted() {
 			return true
 		}
 	case vfs.CryptedFilesystemProvider:
@@ -438,6 +463,7 @@ func (u *User) SetEmptySecrets() {
 	u.FsConfig.S3Config.AccessSecret = kms.NewEmptySecret()
 	u.FsConfig.GCSConfig.Credentials = kms.NewEmptySecret()
 	u.FsConfig.AzBlobConfig.AccountKey = kms.NewEmptySecret()
+	u.FsConfig.AzBlobConfig.SASURL = kms.NewEmptySecret()
 	u.FsConfig.CryptConfig.Passphrase = kms.NewEmptySecret()
 	u.FsConfig.SFTPConfig.Password = kms.NewEmptySecret()
 	u.FsConfig.SFTPConfig.PrivateKey = kms.NewEmptySecret()
@@ -496,6 +522,18 @@ func (u *User) getForbiddenSFTPSelfUsers(username string) ([]string, error) {
 	}
 
 	return nil, nil
+}
+
+// GetFsConfigForPath returns the file system configuration for the specified virtual path
+func (u *User) GetFsConfigForPath(virtualPath string) vfs.Filesystem {
+	if virtualPath != "" && virtualPath != "/" && len(u.VirtualFolders) > 0 {
+		folder, err := u.GetVirtualFolderForPath(virtualPath)
+		if err == nil {
+			return folder.FsConfig
+		}
+	}
+
+	return u.FsConfig
 }
 
 // GetFilesystemForPath returns the filesystem for the given path
@@ -780,43 +818,31 @@ func (u *User) GetAllowedLoginMethods() []string {
 	return allowedMethods
 }
 
-// IsFileAllowed returns true if the specified file is allowed by the file restrictions filters
-func (u *User) IsFileAllowed(virtualPath string) bool {
-	return u.isFilePatternAllowed(virtualPath) && u.isFileExtensionAllowed(virtualPath)
+// GetFlatFilePatterns returns file patterns as flat list
+// duplicating a path if it has both allowed and denied patterns
+func (u *User) GetFlatFilePatterns() []PatternsFilter {
+	var result []PatternsFilter
+
+	for _, pattern := range u.Filters.FilePatterns {
+		if len(pattern.AllowedPatterns) > 0 {
+			result = append(result, PatternsFilter{
+				Path:            pattern.Path,
+				AllowedPatterns: pattern.AllowedPatterns,
+			})
+		}
+		if len(pattern.DeniedPatterns) > 0 {
+			result = append(result, PatternsFilter{
+				Path:           pattern.Path,
+				DeniedPatterns: pattern.DeniedPatterns,
+			})
+		}
+	}
+	return result
 }
 
-func (u *User) isFileExtensionAllowed(virtualPath string) bool {
-	if len(u.Filters.FileExtensions) == 0 {
-		return true
-	}
-	dirsForPath := utils.GetDirsForVirtualPath(path.Dir(virtualPath))
-	var filter ExtensionsFilter
-	for _, dir := range dirsForPath {
-		for _, f := range u.Filters.FileExtensions {
-			if f.Path == dir {
-				filter = f
-				break
-			}
-		}
-		if filter.Path != "" {
-			break
-		}
-	}
-	if filter.Path != "" {
-		toMatch := strings.ToLower(virtualPath)
-		for _, denied := range filter.DeniedExtensions {
-			if strings.HasSuffix(toMatch, denied) {
-				return false
-			}
-		}
-		for _, allowed := range filter.AllowedExtensions {
-			if strings.HasSuffix(toMatch, allowed) {
-				return true
-			}
-		}
-		return len(filter.AllowedExtensions) == 0
-	}
-	return true
+// IsFileAllowed returns true if the specified file is allowed by the file restrictions filters
+func (u *User) IsFileAllowed(virtualPath string) bool {
+	return u.isFilePatternAllowed(virtualPath)
 }
 
 func (u *User) isFilePatternAllowed(virtualPath string) bool {
@@ -1115,8 +1141,6 @@ func (u *User) getACopy() User {
 	copy(filters.DeniedIP, u.Filters.DeniedIP)
 	filters.DeniedLoginMethods = make([]string, len(u.Filters.DeniedLoginMethods))
 	copy(filters.DeniedLoginMethods, u.Filters.DeniedLoginMethods)
-	filters.FileExtensions = make([]ExtensionsFilter, len(u.Filters.FileExtensions))
-	copy(filters.FileExtensions, u.Filters.FileExtensions)
 	filters.FilePatterns = make([]PatternsFilter, len(u.Filters.FilePatterns))
 	copy(filters.FilePatterns, u.Filters.FilePatterns)
 	filters.DeniedProtocols = make([]string, len(u.Filters.DeniedProtocols))

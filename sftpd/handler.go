@@ -33,6 +33,9 @@ func (c *Connection) GetClientVersion() string {
 
 // GetRemoteAddress return the connected client's address
 func (c *Connection) GetRemoteAddress() string {
+	if c.RemoteAddr == nil {
+		return ""
+	}
 	return c.RemoteAddr.String()
 }
 
@@ -59,13 +62,18 @@ func (c *Connection) Fileread(request *sftp.Request) (io.ReaderAt, error) {
 		return nil, err
 	}
 
+	if err := common.ExecutePreAction(&c.User, common.OperationPreDownload, p, request.Filepath, c.GetProtocol(), 0, 0); err != nil {
+		c.Log(logger.LevelDebug, "download for file %#v denied by pre action: %v", request.Filepath, err)
+		return nil, c.GetPermissionDeniedError()
+	}
+
 	file, r, cancelFn, err := fs.Open(p, 0)
 	if err != nil {
 		c.Log(logger.LevelWarn, "could not open file %#v for reading: %+v", p, err)
 		return nil, c.GetFsError(fs, err)
 	}
 
-	baseTransfer := common.NewBaseTransfer(file, c.BaseConnection, cancelFn, p, request.Filepath, common.TransferDownload,
+	baseTransfer := common.NewBaseTransfer(file, c.BaseConnection, cancelFn, p, p, request.Filepath, common.TransferDownload,
 		0, 0, 0, false, fs)
 	t := newTransfer(baseTransfer, nil, r, nil)
 
@@ -325,6 +333,11 @@ func (c *Connection) handleSFTPUploadToNewFile(fs vfs.Fs, resolvedPath, filePath
 		return nil, sftp.ErrSSHFxFailure
 	}
 
+	if err := common.ExecutePreAction(&c.User, common.OperationPreUpload, resolvedPath, requestPath, c.GetProtocol(), 0, 0); err != nil {
+		c.Log(logger.LevelDebug, "upload for file %#v denied by pre action: %v", requestPath, err)
+		return nil, c.GetPermissionDeniedError()
+	}
+
 	file, w, cancelFn, err := fs.Create(filePath, 0)
 	if err != nil {
 		c.Log(logger.LevelWarn, "error creating file %#v: %+v", resolvedPath, err)
@@ -336,7 +349,7 @@ func (c *Connection) handleSFTPUploadToNewFile(fs vfs.Fs, resolvedPath, filePath
 	// we can get an error only for resume
 	maxWriteSize, _ := c.GetMaxWriteSize(quotaResult, false, 0, fs.IsUploadResumeSupported())
 
-	baseTransfer := common.NewBaseTransfer(file, c.BaseConnection, cancelFn, resolvedPath, requestPath,
+	baseTransfer := common.NewBaseTransfer(file, c.BaseConnection, cancelFn, resolvedPath, filePath, requestPath,
 		common.TransferUpload, 0, 0, maxWriteSize, true, fs)
 	t := newTransfer(baseTransfer, w, nil, errForRead)
 
@@ -352,8 +365,8 @@ func (c *Connection) handleSFTPUploadToExistingFile(fs vfs.Fs, pflags sftp.FileO
 		return nil, sftp.ErrSSHFxFailure
 	}
 
-	minWriteOffset := int64(0)
 	osFlags := getOSOpenFlags(pflags)
+	minWriteOffset := int64(0)
 	isTruncate := osFlags&os.O_TRUNC != 0
 	// for upload resumes OpenSSH sets the APPEND flag while WinSCP does not set it,
 	// so we suppose this is an upload resume if the TRUNCATE flag is not set
@@ -365,6 +378,11 @@ func (c *Connection) handleSFTPUploadToExistingFile(fs vfs.Fs, pflags sftp.FileO
 	if err != nil {
 		c.Log(logger.LevelDebug, "unable to get max write size: %v", err)
 		return nil, err
+	}
+
+	if err := common.ExecutePreAction(&c.User, common.OperationPreUpload, resolvedPath, requestPath, c.GetProtocol(), fileSize, osFlags); err != nil {
+		c.Log(logger.LevelDebug, "upload for file %#v denied by pre action: %v", requestPath, err)
+		return nil, c.GetPermissionDeniedError()
 	}
 
 	if common.Config.IsAtomicUploadEnabled() && fs.IsAtomicUploadSupported() {
@@ -409,7 +427,7 @@ func (c *Connection) handleSFTPUploadToExistingFile(fs vfs.Fs, pflags sftp.FileO
 
 	vfs.SetPathPermissions(fs, filePath, c.User.GetUID(), c.User.GetGID())
 
-	baseTransfer := common.NewBaseTransfer(file, c.BaseConnection, cancelFn, resolvedPath, requestPath,
+	baseTransfer := common.NewBaseTransfer(file, c.BaseConnection, cancelFn, resolvedPath, filePath, requestPath,
 		common.TransferUpload, minWriteOffset, initialSize, maxWriteSize, false, fs)
 	t := newTransfer(baseTransfer, w, nil, errForRead)
 

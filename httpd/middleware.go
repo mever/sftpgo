@@ -3,7 +3,9 @@ package httpd
 import (
 	"errors"
 	"net/http"
+	"runtime/debug"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/lestrrat-go/jwx/jwt"
 
@@ -34,9 +36,11 @@ func validateJWTToken(w http.ResponseWriter, r *http.Request, audience tokenAudi
 		redirectPath = webClientLoginPath
 	}
 
+	isAPIToken := (audience == tokenAudienceAPI || audience == tokenAudienceAPIUser)
+
 	if err != nil || token == nil {
 		logger.Debug(logSender, "", "error getting jwt token: %v", err)
-		if audience == tokenAudienceAPI {
+		if isAPIToken {
 			sendAPIResponse(w, r, err, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		} else {
 			http.Redirect(w, r, redirectPath, http.StatusFound)
@@ -47,7 +51,7 @@ func validateJWTToken(w http.ResponseWriter, r *http.Request, audience tokenAudi
 	err = jwt.Validate(token)
 	if err != nil {
 		logger.Debug(logSender, "", "error validating jwt token: %v", err)
-		if audience == tokenAudienceAPI {
+		if isAPIToken {
 			sendAPIResponse(w, r, err, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		} else {
 			http.Redirect(w, r, redirectPath, http.StatusFound)
@@ -56,7 +60,7 @@ func validateJWTToken(w http.ResponseWriter, r *http.Request, audience tokenAudi
 	}
 	if !utils.IsStringInSlice(audience, token.Audience()) {
 		logger.Debug(logSender, "", "the token is not valid for audience %#v", audience)
-		if audience == tokenAudienceAPI {
+		if isAPIToken {
 			sendAPIResponse(w, r, nil, "Your token audience is not valid", http.StatusUnauthorized)
 		} else {
 			http.Redirect(w, r, redirectPath, http.StatusFound)
@@ -65,7 +69,7 @@ func validateJWTToken(w http.ResponseWriter, r *http.Request, audience tokenAudi
 	}
 	if isTokenInvalidated(r) {
 		logger.Debug(logSender, "", "the token has been invalidated")
-		if audience == tokenAudienceAPI {
+		if isAPIToken {
 			sendAPIResponse(w, r, nil, "Your token is no longer valid", http.StatusUnauthorized)
 		} else {
 			http.Redirect(w, r, redirectPath, http.StatusFound)
@@ -78,6 +82,17 @@ func validateJWTToken(w http.ResponseWriter, r *http.Request, audience tokenAudi
 func jwtAuthenticatorAPI(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := validateJWTToken(w, r, tokenAudienceAPI); err != nil {
+			return
+		}
+
+		// Token is authenticated, pass it through
+		next.ServeHTTP(w, r)
+	})
+}
+
+func jwtAuthenticatorAPIUser(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := validateJWTToken(w, r, tokenAudienceAPIUser); err != nil {
 			return
 		}
 
@@ -108,19 +123,28 @@ func jwtAuthenticatorWebClient(next http.Handler) http.Handler {
 	})
 }
 
-func checkClientPerm(perm string) func(next http.Handler) http.Handler {
+//nolint:unparam
+func checkHTTPUserPerm(perm string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			_, claims, err := jwtauth.FromContext(r.Context())
 			if err != nil {
-				renderClientBadRequestPage(w, r, err)
+				if isWebRequest(r) {
+					renderClientBadRequestPage(w, r, err)
+				} else {
+					sendAPIResponse(w, r, err, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				}
 				return
 			}
 			tokenClaims := jwtTokenClaims{}
 			tokenClaims.Decode(claims)
 			// for web client perms are negated and not granted
 			if tokenClaims.hasPerm(perm) {
-				renderClientForbiddenPage(w, r, "You don't have permission for this action")
+				if isWebRequest(r) {
+					renderClientForbiddenPage(w, r, "You don't have permission for this action")
+				} else {
+					sendAPIResponse(w, r, nil, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				}
 				return
 			}
 
@@ -176,4 +200,29 @@ func verifyCSRFHeader(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func recoverer(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rvr := recover(); rvr != nil {
+				if rvr == http.ErrAbortHandler {
+					panic(rvr)
+				}
+
+				logEntry := middleware.GetLogEntry(r)
+				if logEntry != nil {
+					logEntry.Panic(rvr, debug.Stack())
+				} else {
+					middleware.PrintPrettyStack(rvr)
+				}
+
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+		}()
+
+		next.ServeHTTP(w, r)
+	}
+
+	return http.HandlerFunc(fn)
 }

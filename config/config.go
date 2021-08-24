@@ -115,6 +115,7 @@ func Init() {
 				Hook:        "",
 			},
 			SetstatMode:           0,
+			TempPath:              "",
 			ProxyProtocol:         0,
 			ProxyAllowed:          []string{},
 			PostConnectHook:       "",
@@ -256,6 +257,7 @@ func Init() {
 			CACertificates: nil,
 			Certificates:   nil,
 			SkipTLSVerify:  false,
+			Headers:        nil,
 		},
 		KMSConfig: kms.Configuration{
 			Secrets: kms.Secrets{
@@ -577,6 +579,7 @@ func loadBindingsFromEnv() {
 		getWebDAVDBindingFromEnv(idx)
 		getHTTPDBindingFromEnv(idx)
 		getHTTPClientCertificatesFromEnv(idx)
+		getHTTPClientHeadersFromEnv(idx)
 	}
 }
 
@@ -889,6 +892,33 @@ func getHTTPClientCertificatesFromEnv(idx int) {
 	}
 }
 
+func getHTTPClientHeadersFromEnv(idx int) {
+	header := httpclient.Header{}
+
+	key, ok := os.LookupEnv(fmt.Sprintf("SFTPGO_HTTP__HEADERS__%v__KEY", idx))
+	if ok {
+		header.Key = key
+	}
+
+	value, ok := os.LookupEnv(fmt.Sprintf("SFTPGO_HTTP__HEADERS__%v__VALUE", idx))
+	if ok {
+		header.Value = value
+	}
+
+	url, ok := os.LookupEnv(fmt.Sprintf("SFTPGO_HTTP__HEADERS__%v__URL", idx))
+	if ok {
+		header.URL = url
+	}
+
+	if header.Key != "" && header.Value != "" {
+		if len(globalConf.HTTPConfig.Headers) > idx {
+			globalConf.HTTPConfig.Headers[idx] = header
+		} else {
+			globalConf.HTTPConfig.Headers = append(globalConf.HTTPConfig.Headers, header)
+		}
+	}
+}
+
 func setViperDefaults() {
 	viper.SetDefault("common.idle_timeout", globalConf.Common.IdleTimeout)
 	viper.SetDefault("common.upload_mode", globalConf.Common.UploadMode)
@@ -896,6 +926,7 @@ func setViperDefaults() {
 	viper.SetDefault("common.actions.execute_sync", globalConf.Common.Actions.ExecuteSync)
 	viper.SetDefault("common.actions.hook", globalConf.Common.Actions.Hook)
 	viper.SetDefault("common.setstat_mode", globalConf.Common.SetstatMode)
+	viper.SetDefault("common.temp_path", globalConf.Common.TempPath)
 	viper.SetDefault("common.proxy_protocol", globalConf.Common.ProxyProtocol)
 	viper.SetDefault("common.proxy_allowed", globalConf.Common.ProxyAllowed)
 	viper.SetDefault("common.post_connect_hook", globalConf.Common.PostConnectHook)

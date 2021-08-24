@@ -23,28 +23,34 @@ import (
 	"github.com/drakkan/sftpgo/logger"
 	"github.com/drakkan/sftpgo/metrics"
 	"github.com/drakkan/sftpgo/utils"
+	"github.com/drakkan/sftpgo/vfs"
 )
 
 // constants
 const (
-	logSender                = "common"
-	uploadLogSender          = "Upload"
-	downloadLogSender        = "Download"
-	renameLogSender          = "Rename"
-	rmdirLogSender           = "Rmdir"
-	mkdirLogSender           = "Mkdir"
-	symlinkLogSender         = "Symlink"
-	removeLogSender          = "Remove"
-	chownLogSender           = "Chown"
-	chmodLogSender           = "Chmod"
-	chtimesLogSender         = "Chtimes"
-	truncateLogSender        = "Truncate"
-	operationDownload        = "download"
-	operationUpload          = "upload"
-	operationDelete          = "delete"
-	operationPreDelete       = "pre-delete"
-	operationRename          = "rename"
-	operationSSHCmd          = "ssh_cmd"
+	logSender         = "common"
+	uploadLogSender   = "Upload"
+	downloadLogSender = "Download"
+	renameLogSender   = "Rename"
+	rmdirLogSender    = "Rmdir"
+	mkdirLogSender    = "Mkdir"
+	symlinkLogSender  = "Symlink"
+	removeLogSender   = "Remove"
+	chownLogSender    = "Chown"
+	chmodLogSender    = "Chmod"
+	chtimesLogSender  = "Chtimes"
+	truncateLogSender = "Truncate"
+	operationDownload = "download"
+	operationUpload   = "upload"
+	operationDelete   = "delete"
+	// Pre-download action name
+	OperationPreDownload = "pre-download"
+	// Pre-upload action name
+	OperationPreUpload = "pre-upload"
+	operationPreDelete = "pre-delete"
+	operationRename    = "rename"
+	// SSH command action name
+	OperationSSHCmd          = "ssh_cmd"
 	chtimesFormat            = "2006-01-02T15:04:05" // YYYY-MM-DDTHH:MM:SS
 	idleTimeoutCheckInterval = 3 * time.Minute
 )
@@ -97,6 +103,8 @@ var (
 	ErrConnectionDenied     = errors.New("you are not allowed to connect")
 	ErrNoBinding            = errors.New("no binding configured")
 	ErrCrtRevoked           = errors.New("your certificate has been revoked")
+	ErrNoCredentials        = errors.New("no credential provided")
+	ErrInternalFailure      = errors.New("internal failure")
 	errNoTransfer           = errors.New("requested transfer not found")
 	errTransferMismatch     = errors.New("transfer mismatch")
 )
@@ -144,6 +152,8 @@ func Initialize(c Configuration) error {
 			}
 		}
 	}
+	vfs.SetTempPath(c.TempPath)
+	dataprovider.SetTempPath(c.TempPath)
 	return nil
 }
 
@@ -189,13 +199,31 @@ func GetDefenderBanTime(ip string) *time.Time {
 	return Config.defender.GetBanTime(ip)
 }
 
-// Unban removes the specified IP address from the banned ones
-func Unban(ip string) bool {
+// GetDefenderHosts returns hosts that are banned or for which some violations have been detected
+func GetDefenderHosts() []*DefenderEntry {
+	if Config.defender == nil {
+		return nil
+	}
+
+	return Config.defender.GetHosts()
+}
+
+// GetDefenderHost returns a defender host by ip, if any
+func GetDefenderHost(ip string) (*DefenderEntry, error) {
+	if Config.defender == nil {
+		return nil, errors.New("defender is disabled")
+	}
+
+	return Config.defender.GetHost(ip)
+}
+
+// DeleteDefenderHost removes the specified IP address from the defender lists
+func DeleteDefenderHost(ip string) bool {
 	if Config.defender == nil {
 		return false
 	}
 
-	return Config.defender.Unban(ip)
+	return Config.defender.DeleteHost(ip)
 }
 
 // GetDefenderScore returns the score for the given IP
@@ -330,6 +358,12 @@ type Configuration struct {
 	// 2 means "ignore mode for cloud fs": requests for changing permissions and owner/group/time are
 	// silently ignored for cloud based filesystem such as S3, GCS, Azure Blob
 	SetstatMode int `json:"setstat_mode" mapstructure:"setstat_mode"`
+	// TempPath defines the path for temporary files such as those used for atomic uploads or file pipes.
+	// If you set this option you must make sure that the defined path exists, is accessible for writing
+	// by the user running SFTPGo, and is on the same filesystem as the users home directories otherwise
+	// the renaming for atomic uploads will become a copy and therefore may take a long time.
+	// The temporary files are not namespaced. The default is generally fine. Leave empty for the default.
+	TempPath string `json:"temp_path" mapstructure:"temp_path"`
 	// Support for HAProxy PROXY protocol.
 	// If you are running SFTPGo behind a proxy server such as HAProxy, AWS ELB or NGNIX, you can enable
 	// the proxy protocol. It provides a convenient way to safely transport connection information
@@ -420,8 +454,7 @@ func (c *Configuration) ExecuteStartupHook() error {
 			return err
 		}
 		startTime := time.Now()
-		httpClient := httpclient.GetRetraybleHTTPClient()
-		resp, err := httpClient.Get(url.String())
+		resp, err := httpclient.RetryableGet(url.String())
 		if err != nil {
 			logger.Warn(logSender, "", "Error executing startup hook: %v", err)
 			return err
@@ -457,13 +490,12 @@ func (c *Configuration) ExecutePostConnectHook(ipAddr, protocol string) error {
 				ipAddr, c.PostConnectHook, err)
 			return err
 		}
-		httpClient := httpclient.GetRetraybleHTTPClient()
 		q := url.Query()
 		q.Add("ip", ipAddr)
 		q.Add("protocol", protocol)
 		url.RawQuery = q.Encode()
 
-		resp, err := httpClient.Get(url.String())
+		resp, err := httpclient.RetryableGet(url.String())
 		if err != nil {
 			logger.Warn(protocol, "", "Login from ip %#v denied, error executing post connect hook: %v", ipAddr, err)
 			return err
