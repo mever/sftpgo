@@ -21,6 +21,7 @@ const (
 	tokenAudienceWebAdmin  tokenAudience = "WebAdmin"
 	tokenAudienceWebClient tokenAudience = "WebClient"
 	tokenAudienceAPI       tokenAudience = "API"
+	tokenAudienceAPIUser   tokenAudience = "APIUser"
 	tokenAudienceCSRF      tokenAudience = "CSRF"
 )
 
@@ -31,8 +32,8 @@ const (
 )
 
 var (
-	tokenDuration   = 10 * time.Minute
-	tokenRefreshMin = 5 * time.Minute
+	tokenDuration   = 15 * time.Minute
+	tokenRefreshMin = 10 * time.Minute
 )
 
 type jwtTokenClaims struct {
@@ -245,7 +246,7 @@ func createCSRFToken() string {
 func verifyCSRFToken(tokenString string) error {
 	token, err := jwtauth.VerifyToken(csrfTokenAuth, tokenString)
 	if err != nil || token == nil {
-		logger.Debug(logSender, "", "error validating CSRF: %v", err)
+		logger.Debug(logSender, "", "error validating CSRF token %#v: %v", tokenString, err)
 		return fmt.Errorf("unable to verify form token: %v", err)
 	}
 

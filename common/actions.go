@@ -49,9 +49,24 @@ func InitializeActionHandler(handler ActionHandler) {
 	actionHandler = handler
 }
 
+// ExecutePreAction executes a pre-* action and returns the result
+func ExecutePreAction(user *dataprovider.User, operation, filePath, virtualPath, protocol string, fileSize int64, openFlags int) error {
+	if !utils.IsStringInSlice(operation, Config.Actions.ExecuteOn) {
+		// for pre-delete we execute the internal handling on error, so we must return errUnconfiguredAction.
+		// Other pre action will deny the operation on error so if we have no configuration we must return
+		// a nil error
+		if operation == operationPreDelete {
+			return errUnconfiguredAction
+		}
+		return nil
+	}
+	notification := newActionNotification(user, operation, filePath, virtualPath, "", "", protocol, fileSize, openFlags, nil)
+	return actionHandler.Handle(notification)
+}
+
 // ExecuteActionNotification executes the defined hook, if any, for the specified action
-func ExecuteActionNotification(user *dataprovider.User, operation, filePath, target, sshCmd, protocol string, fileSize int64, err error) {
-	notification := newActionNotification(user, operation, filePath, target, sshCmd, protocol, fileSize, err)
+func ExecuteActionNotification(user *dataprovider.User, operation, filePath, virtualPath, target, sshCmd, protocol string, fileSize int64, err error) {
+	notification := newActionNotification(user, operation, filePath, virtualPath, target, sshCmd, protocol, fileSize, 0, err)
 
 	if utils.IsStringInSlice(operation, Config.Actions.ExecuteSync) {
 		actionHandler.Handle(notification) //nolint:errcheck
@@ -79,29 +94,34 @@ type ActionNotification struct {
 	Endpoint   string `json:"endpoint,omitempty"`
 	Status     int    `json:"status"`
 	Protocol   string `json:"protocol"`
+	OpenFlags  int    `json:"open_flags,omitempty"`
 }
 
 func newActionNotification(
 	user *dataprovider.User,
-	operation, filePath, target, sshCmd, protocol string,
+	operation, filePath, virtualPath, target, sshCmd, protocol string,
 	fileSize int64,
+	openFlags int,
 	err error,
 ) *ActionNotification {
 	var bucket, endpoint string
 	status := 1
 
-	if user.FsConfig.Provider == vfs.S3FilesystemProvider {
-		bucket = user.FsConfig.S3Config.Bucket
-		endpoint = user.FsConfig.S3Config.Endpoint
-	} else if user.FsConfig.Provider == vfs.GCSFilesystemProvider {
-		bucket = user.FsConfig.GCSConfig.Bucket
-	} else if user.FsConfig.Provider == vfs.AzureBlobFilesystemProvider {
-		bucket = user.FsConfig.AzBlobConfig.Container
-		if user.FsConfig.AzBlobConfig.SASURL != "" {
-			endpoint = user.FsConfig.AzBlobConfig.SASURL
-		} else {
-			endpoint = user.FsConfig.AzBlobConfig.Endpoint
+	fsConfig := user.GetFsConfigForPath(virtualPath)
+
+	switch fsConfig.Provider {
+	case vfs.S3FilesystemProvider:
+		bucket = fsConfig.S3Config.Bucket
+		endpoint = fsConfig.S3Config.Endpoint
+	case vfs.GCSFilesystemProvider:
+		bucket = fsConfig.GCSConfig.Bucket
+	case vfs.AzureBlobFilesystemProvider:
+		bucket = fsConfig.AzBlobConfig.Container
+		if fsConfig.AzBlobConfig.Endpoint != "" {
+			endpoint = fsConfig.AzBlobConfig.Endpoint
 		}
+	case vfs.SFTPFilesystemProvider:
+		endpoint = fsConfig.SFTPConfig.Endpoint
 	}
 
 	if err == ErrQuotaExceeded {
@@ -117,11 +137,12 @@ func newActionNotification(
 		TargetPath: target,
 		SSHCmd:     sshCmd,
 		FileSize:   fileSize,
-		FsProvider: int(user.FsConfig.Provider),
+		FsProvider: int(fsConfig.Provider),
 		Bucket:     bucket,
 		Endpoint:   endpoint,
 		Status:     status,
 		Protocol:   protocol,
+		OpenFlags:  openFlags,
 	}
 }
 
@@ -155,12 +176,10 @@ func (h *defaultActionHandler) handleHTTP(notification *ActionNotification) erro
 	startTime := time.Now()
 	respCode := 0
 
-	httpClient := httpclient.GetRetraybleHTTPClient()
-
 	var b bytes.Buffer
 	_ = json.NewEncoder(&b).Encode(notification)
 
-	resp, err := httpClient.Post(u.String(), "application/json", &b)
+	resp, err := httpclient.RetryablePost(Config.Actions.Hook, "application/json", &b)
 	if err == nil {
 		respCode = resp.StatusCode
 		resp.Body.Close()
@@ -170,8 +189,8 @@ func (h *defaultActionHandler) handleHTTP(notification *ActionNotification) erro
 		}
 	}
 
-	logger.Debug(notification.Protocol, "", "notified operation %#v to URL: %v status code: %v, elapsed: %v err: %v", notification.Action,
-		u.Redacted(), respCode, time.Since(startTime), err)
+	logger.Debug(notification.Protocol, "", "notified operation %#v to URL: %v status code: %v, elapsed: %v err: %v",
+		notification.Action, u.Redacted(), respCode, time.Since(startTime), err)
 
 	return err
 }
@@ -212,5 +231,6 @@ func notificationAsEnvVars(notification *ActionNotification) []string {
 		fmt.Sprintf("SFTPGO_ACTION_ENDPOINT=%v", notification.Endpoint),
 		fmt.Sprintf("SFTPGO_ACTION_STATUS=%v", notification.Status),
 		fmt.Sprintf("SFTPGO_ACTION_PROTOCOL=%v", notification.Protocol),
+		fmt.Sprintf("SFTPGO_ACTION_OPEN_FLAGS=%v", notification.OpenFlags),
 	}
 }

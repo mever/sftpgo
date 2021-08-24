@@ -174,7 +174,11 @@ func (c *sshCommand) handleSFTPGoCopy() error {
 		return c.sendErrorResponse(err)
 	}
 	c.connection.Log(logger.LevelDebug, "start copy %#v -> %#v", fsSourcePath, fsDestPath)
-	err = fscopy.Copy(fsSourcePath, fsDestPath)
+	err = fscopy.Copy(fsSourcePath, fsDestPath, fscopy.Options{
+		OnSymlink: func(src string) fscopy.SymlinkAction {
+			return fscopy.Skip
+		},
+	})
 	if err != nil {
 		return c.sendErrorResponse(c.connection.GetFsError(fsSrc, err))
 	}
@@ -350,7 +354,7 @@ func (c *sshCommand) executeSystemCommand(command systemCommand) error {
 
 	go func() {
 		defer stdin.Close()
-		baseTransfer := common.NewBaseTransfer(nil, c.connection.BaseConnection, nil, command.fsPath, sshDestPath,
+		baseTransfer := common.NewBaseTransfer(nil, c.connection.BaseConnection, nil, command.fsPath, command.fsPath, sshDestPath,
 			common.TransferUpload, 0, 0, remainingQuotaSize, false, command.fs)
 		transfer := newTransfer(baseTransfer, nil, nil, nil)
 
@@ -363,7 +367,7 @@ func (c *sshCommand) executeSystemCommand(command systemCommand) error {
 	}()
 
 	go func() {
-		baseTransfer := common.NewBaseTransfer(nil, c.connection.BaseConnection, nil, command.fsPath, sshDestPath,
+		baseTransfer := common.NewBaseTransfer(nil, c.connection.BaseConnection, nil, command.fsPath, command.fsPath, sshDestPath,
 			common.TransferDownload, 0, 0, 0, false, command.fs)
 		transfer := newTransfer(baseTransfer, nil, nil, nil)
 
@@ -377,7 +381,7 @@ func (c *sshCommand) executeSystemCommand(command systemCommand) error {
 	}()
 
 	go func() {
-		baseTransfer := common.NewBaseTransfer(nil, c.connection.BaseConnection, nil, command.fsPath, sshDestPath,
+		baseTransfer := common.NewBaseTransfer(nil, c.connection.BaseConnection, nil, command.fsPath, command.fsPath, sshDestPath,
 			common.TransferDownload, 0, 0, 0, false, command.fs)
 		transfer := newTransfer(baseTransfer, nil, nil, nil)
 
@@ -415,17 +419,17 @@ func (c *sshCommand) isSystemCommandAllowed() error {
 			c.command, sshDestPath, c.connection.User.Username)
 		return errUnsupportedConfig
 	}
-	for _, f := range c.connection.User.Filters.FileExtensions {
+	for _, f := range c.connection.User.Filters.FilePatterns {
 		if f.Path == sshDestPath {
 			c.connection.Log(logger.LevelDebug,
-				"command %#v is not allowed inside folders with files extensions filters %#v user %#v",
+				"command %#v is not allowed inside folders with file patterns filters %#v user %#v",
 				c.command, sshDestPath, c.connection.User.Username)
 			return errUnsupportedConfig
 		}
 		if len(sshDestPath) > len(f.Path) {
 			if strings.HasPrefix(sshDestPath, f.Path+"/") || f.Path == "/" {
 				c.connection.Log(logger.LevelDebug,
-					"command %#v is not allowed it includes folders with files extensions filters %#v user %#v",
+					"command %#v is not allowed it includes folders with file patterns filters %#v user %#v",
 					c.command, sshDestPath, c.connection.User.Username)
 				return errUnsupportedConfig
 			}
@@ -433,7 +437,7 @@ func (c *sshCommand) isSystemCommandAllowed() error {
 		if len(sshDestPath) < len(f.Path) {
 			if strings.HasPrefix(sshDestPath+"/", f.Path) || sshDestPath == "/" {
 				c.connection.Log(logger.LevelDebug,
-					"command %#v is not allowed inside folder with files extensions filters %#v user %#v",
+					"command %#v is not allowed inside folder with file patterns filters %#v user %#v",
 					c.command, sshDestPath, c.connection.User.Username)
 				return errUnsupportedConfig
 			}
@@ -722,15 +726,12 @@ func (c *sshCommand) sendExitStatus(err error) {
 		status = uint32(1)
 		c.connection.Log(logger.LevelWarn, "command failed: %#v args: %v user: %v err: %v",
 			c.command, c.args, c.connection.User.Username, err)
-	} else {
-		logger.CommandLog(sshCommandLogSender, cmdPath, targetPath, c.connection.User.Username, "", c.connection.ID,
-			common.ProtocolSSH, -1, -1, "", "", c.connection.command, -1)
 	}
 	exitStatus := sshSubsystemExitStatus{
 		Status: status,
 	}
-	_, err = c.connection.channel.(ssh.Channel).SendRequest("exit-status", false, ssh.Marshal(&exitStatus))
-	c.connection.Log(logger.LevelDebug, "exit status sent, error: %v", err)
+	_, errClose := c.connection.channel.(ssh.Channel).SendRequest("exit-status", false, ssh.Marshal(&exitStatus))
+	c.connection.Log(logger.LevelDebug, "exit status sent, error: %v", errClose)
 	c.connection.channel.Close()
 	// for scp we notify single uploads/downloads
 	if c.command != scpCmdName {
@@ -747,7 +748,12 @@ func (c *sshCommand) sendExitStatus(err error) {
 				targetPath = p
 			}
 		}
-		common.ExecuteActionNotification(&c.connection.User, "ssh_cmd", cmdPath, targetPath, c.command, common.ProtocolSSH, 0, err)
+		common.ExecuteActionNotification(&c.connection.User, common.OperationSSHCmd, cmdPath, c.getDestPath(), targetPath, c.command,
+			common.ProtocolSSH, 0, err)
+		if err == nil {
+			logger.CommandLog(sshCommandLogSender, cmdPath, targetPath, c.connection.User.Username, "", c.connection.ID,
+				common.ProtocolSSH, -1, -1, "", "", c.connection.command, -1, c.connection.GetRemoteAddress())
+		}
 	}
 }
 

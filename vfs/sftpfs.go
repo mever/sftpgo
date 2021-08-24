@@ -175,7 +175,11 @@ type SFTPFs struct {
 // NewSFTPFs returns an SFTPFs object that allows to interact with an SFTP server
 func NewSFTPFs(connectionID, mountPath, localTempDir string, forbiddenSelfUsernames []string, config SFTPFsConfig) (Fs, error) {
 	if localTempDir == "" {
-		localTempDir = filepath.Clean(os.TempDir())
+		if tempPath != "" {
+			localTempDir = tempPath
+		} else {
+			localTempDir = filepath.Clean(os.TempDir())
+		}
 	}
 	if err := config.Validate(); err != nil {
 		return nil, err
@@ -246,6 +250,9 @@ func (fs *SFTPFs) Open(name string, offset int64) (File, *pipeat.PipeReaderAt, f
 		return nil, nil, nil, err
 	}
 	f, err := fs.sftpClient.Open(name)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	if fs.config.BufferSize == 0 {
 		return f, nil, nil, err
 	}
@@ -262,6 +269,9 @@ func (fs *SFTPFs) Open(name string, offset int64) (File, *pipeat.PipeReaderAt, f
 		return nil, nil, nil, err
 	}
 	go func() {
+		// if we enable buffering the client stalls
+		//br := bufio.NewReaderSize(f, int(fs.config.BufferSize)*1024*1024)
+		//n, err := fs.copy(w, br)
 		n, err := io.Copy(w, f)
 		w.CloseWithError(err) //nolint:errcheck
 		f.Close()

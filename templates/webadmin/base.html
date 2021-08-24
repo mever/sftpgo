@@ -17,6 +17,7 @@
     <!-- Custom fonts for this template-->
     <link href="{{.StaticURL}}/vendor/fontawesome-free/css/fontawesome.min.css" rel="stylesheet" type="text/css">
     <link href="{{.StaticURL}}/vendor/fontawesome-free/css/solid.min.css" rel="stylesheet" type="text/css">
+    <link href="{{.StaticURL}}/vendor/fontawesome-free/css/regular.min.css" rel="stylesheet" type="text/css">
 
     <!-- Custom styles for this template-->
     <link href="{{.StaticURL}}/css/sb-admin-2.min.css" rel="stylesheet">
@@ -93,6 +94,14 @@
                 <a class="nav-link" href="{{.ConnectionsURL}}">
                     <i class="fas fa-exchange-alt"></i>
                     <span>{{.ConnectionsTitle}}</span></a>
+            </li>
+            {{end}}
+
+            {{ if and .HasDefender (.LoggedAdmin.HasPermission "view_defender")}}
+            <li class="nav-item {{if eq .CurrentURL .DefenderURL}}active{{end}}">
+                <a class="nav-link" href="{{.DefenderURL}}">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>{{.DefenderTitle}}</span></a>
             </li>
             {{end}}
 

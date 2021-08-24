@@ -3,6 +3,7 @@ package httpdtest
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,23 +27,23 @@ import (
 )
 
 const (
-	tokenPath                 = "/api/v2/token"
-	activeConnectionsPath     = "/api/v2/connections"
-	quotaScanPath             = "/api/v2/quota-scans"
-	quotaScanVFolderPath      = "/api/v2/folder-quota-scans"
-	userPath                  = "/api/v2/users"
-	versionPath               = "/api/v2/version"
-	folderPath                = "/api/v2/folders"
-	serverStatusPath          = "/api/v2/status"
-	dumpDataPath              = "/api/v2/dumpdata"
-	loadDataPath              = "/api/v2/loaddata"
-	updateUsedQuotaPath       = "/api/v2/quota-update"
-	updateFolderUsedQuotaPath = "/api/v2/folder-quota-update"
-	defenderBanTime           = "/api/v2/defender/bantime"
-	defenderUnban             = "/api/v2/defender/unban"
-	defenderScore             = "/api/v2/defender/score"
-	adminPath                 = "/api/v2/admins"
-	adminPwdPath              = "/api/v2/changepwd/admin"
+	tokenPath             = "/api/v2/token"
+	activeConnectionsPath = "/api/v2/connections"
+	quotasBasePath        = "/api/v2/quotas"
+	quotaScanPath         = "/api/v2/quotas/users/scans"
+	quotaScanVFolderPath  = "/api/v2/quotas/folders/scans"
+	userPath              = "/api/v2/users"
+	versionPath           = "/api/v2/version"
+	folderPath            = "/api/v2/folders"
+	serverStatusPath      = "/api/v2/status"
+	dumpDataPath          = "/api/v2/dumpdata"
+	loadDataPath          = "/api/v2/loaddata"
+	defenderHosts         = "/api/v2/defender/hosts"
+	defenderBanTime       = "/api/v2/defender/bantime"
+	defenderUnban         = "/api/v2/defender/unban"
+	defenderScore         = "/api/v2/defender/score"
+	adminPath             = "/api/v2/admins"
+	adminPwdPath          = "/api/v2/admin/changepwd"
 )
 
 const (
@@ -392,9 +393,8 @@ func GetQuotaScans(expectedStatusCode int) ([]common.ActiveQuotaScan, []byte, er
 // StartQuotaScan starts a new quota scan for the given user and checks the received HTTP Status code against expectedStatusCode.
 func StartQuotaScan(user dataprovider.User, expectedStatusCode int) ([]byte, error) {
 	var body []byte
-	userAsJSON, _ := json.Marshal(user)
-	resp, err := sendHTTPRequest(http.MethodPost, buildURLRelativeToBase(quotaScanPath), bytes.NewBuffer(userAsJSON),
-		"", getDefaultToken())
+	resp, err := sendHTTPRequest(http.MethodPost, buildURLRelativeToBase(quotasBasePath, "users", user.Username, "scan"),
+		nil, "", getDefaultToken())
 	if err != nil {
 		return body, err
 	}
@@ -407,7 +407,7 @@ func StartQuotaScan(user dataprovider.User, expectedStatusCode int) ([]byte, err
 func UpdateQuotaUsage(user dataprovider.User, mode string, expectedStatusCode int) ([]byte, error) {
 	var body []byte
 	userAsJSON, _ := json.Marshal(user)
-	url, err := addModeQueryParam(buildURLRelativeToBase(updateUsedQuotaPath), mode)
+	url, err := addModeQueryParam(buildURLRelativeToBase(quotasBasePath, "users", user.Username, "usage"), mode)
 	if err != nil {
 		return body, err
 	}
@@ -584,9 +584,8 @@ func GetFoldersQuotaScans(expectedStatusCode int) ([]common.ActiveVirtualFolderQ
 // StartFolderQuotaScan start a new quota scan for the given folder and checks the received HTTP Status code against expectedStatusCode.
 func StartFolderQuotaScan(folder vfs.BaseVirtualFolder, expectedStatusCode int) ([]byte, error) {
 	var body []byte
-	folderAsJSON, _ := json.Marshal(folder)
-	resp, err := sendHTTPRequest(http.MethodPost, buildURLRelativeToBase(quotaScanVFolderPath),
-		bytes.NewBuffer(folderAsJSON), "", getDefaultToken())
+	resp, err := sendHTTPRequest(http.MethodPost, buildURLRelativeToBase(quotasBasePath, "folders", folder.Name, "scan"),
+		nil, "", getDefaultToken())
 	if err != nil {
 		return body, err
 	}
@@ -599,7 +598,7 @@ func StartFolderQuotaScan(folder vfs.BaseVirtualFolder, expectedStatusCode int) 
 func UpdateFolderQuotaUsage(folder vfs.BaseVirtualFolder, mode string, expectedStatusCode int) ([]byte, error) {
 	var body []byte
 	folderAsJSON, _ := json.Marshal(folder)
-	url, err := addModeQueryParam(buildURLRelativeToBase(updateFolderUsedQuotaPath), mode)
+	url, err := addModeQueryParam(buildURLRelativeToBase(quotasBasePath, "folders", folder.Name, "usage"), mode)
 	if err != nil {
 		return body, err
 	}
@@ -646,6 +645,61 @@ func GetStatus(expectedStatusCode int) (httpd.ServicesStatus, []byte, error) {
 		body, _ = getResponseBody(resp)
 	}
 	return response, body, err
+}
+
+// GetDefenderHosts returns hosts that are banned or for which some violations have been detected
+func GetDefenderHosts(expectedStatusCode int) ([]common.DefenderEntry, []byte, error) {
+	var response []common.DefenderEntry
+	var body []byte
+	url, err := url.Parse(buildURLRelativeToBase(defenderHosts))
+	if err != nil {
+		return response, body, err
+	}
+	resp, err := sendHTTPRequest(http.MethodGet, url.String(), nil, "", getDefaultToken())
+	if err != nil {
+		return response, body, err
+	}
+	defer resp.Body.Close()
+	err = checkResponse(resp.StatusCode, expectedStatusCode)
+	if err == nil && expectedStatusCode == http.StatusOK {
+		err = render.DecodeJSON(resp.Body, &response)
+	} else {
+		body, _ = getResponseBody(resp)
+	}
+	return response, body, err
+}
+
+// GetDefenderHostByIP returns the host with the given IP, if it exists
+func GetDefenderHostByIP(ip string, expectedStatusCode int) (common.DefenderEntry, []byte, error) {
+	var host common.DefenderEntry
+	var body []byte
+	id := hex.EncodeToString([]byte(ip))
+	resp, err := sendHTTPRequest(http.MethodGet, buildURLRelativeToBase(defenderHosts, id),
+		nil, "", getDefaultToken())
+	if err != nil {
+		return host, body, err
+	}
+	defer resp.Body.Close()
+	err = checkResponse(resp.StatusCode, expectedStatusCode)
+	if err == nil && expectedStatusCode == http.StatusOK {
+		err = render.DecodeJSON(resp.Body, &host)
+	} else {
+		body, _ = getResponseBody(resp)
+	}
+	return host, body, err
+}
+
+// RemoveDefenderHostByIP removes the host with the given IP from the defender list
+func RemoveDefenderHostByIP(ip string, expectedStatusCode int) ([]byte, error) {
+	var body []byte
+	id := hex.EncodeToString([]byte(ip))
+	resp, err := sendHTTPRequest(http.MethodDelete, buildURLRelativeToBase(defenderHosts, id), nil, "", getDefaultToken())
+	if err != nil {
+		return body, err
+	}
+	defer resp.Body.Close()
+	body, _ = getResponseBody(resp)
+	return body, checkResponse(resp.StatusCode, expectedStatusCode)
 }
 
 // GetBanTime returns the ban time for the given IP address
@@ -837,10 +891,7 @@ func checkFolder(expected *vfs.BaseVirtualFolder, actual *vfs.BaseVirtualFolder)
 	if expected.Description != actual.Description {
 		return errors.New("description mismatch")
 	}
-	if err := compareFsConfig(&expected.FsConfig, &actual.FsConfig); err != nil {
-		return err
-	}
-	return nil
+	return compareFsConfig(&expected.FsConfig, &actual.FsConfig)
 }
 
 func checkAdmin(expected *dataprovider.Admin, actual *dataprovider.Admin) error {
@@ -981,10 +1032,7 @@ func compareFsConfig(expected *vfs.Filesystem, actual *vfs.Filesystem) error {
 	if err := checkEncryptedSecret(expected.CryptConfig.Passphrase, actual.CryptConfig.Passphrase); err != nil {
 		return err
 	}
-	if err := compareSFTPFsConfig(expected, actual); err != nil {
-		return err
-	}
-	return nil
+	return compareSFTPFsConfig(expected, actual)
 }
 
 func compareS3Config(expected *vfs.Filesystem, actual *vfs.Filesystem) error {
@@ -1084,8 +1132,8 @@ func compareAzBlobConfig(expected *vfs.Filesystem, actual *vfs.Filesystem) error
 	if expected.AzBlobConfig.Endpoint != actual.AzBlobConfig.Endpoint {
 		return errors.New("azure Blob endpoint mismatch")
 	}
-	if expected.AzBlobConfig.SASURL != actual.AzBlobConfig.SASURL {
-		return errors.New("azure Blob SASL URL mismatch")
+	if err := checkEncryptedSecret(expected.AzBlobConfig.SASURL, actual.AzBlobConfig.SASURL); err != nil {
+		return fmt.Errorf("azure Blob SAS URL mismatch: %v", err)
 	}
 	if expected.AzBlobConfig.UploadPartSize != actual.AzBlobConfig.UploadPartSize {
 		return errors.New("azure Blob upload part size mismatch")
@@ -1213,9 +1261,6 @@ func compareUserFilters(expected *dataprovider.User, actual *dataprovider.User) 
 	if err := compareUserFilterSubStructs(expected, actual); err != nil {
 		return err
 	}
-	if err := compareUserFileExtensionsFilters(expected, actual); err != nil {
-		return err
-	}
 	return compareUserFilePatternsFilters(expected, actual)
 }
 
@@ -1248,28 +1293,6 @@ func compareUserFilePatternsFilters(expected *dataprovider.User, actual *datapro
 		}
 		if !found {
 			return errors.New("file patterns contents mismatch")
-		}
-	}
-	return nil
-}
-
-func compareUserFileExtensionsFilters(expected *dataprovider.User, actual *dataprovider.User) error {
-	if len(expected.Filters.FileExtensions) != len(actual.Filters.FileExtensions) {
-		return errors.New("file extensions mismatch")
-	}
-	for _, f := range expected.Filters.FileExtensions {
-		found := false
-		for _, f1 := range actual.Filters.FileExtensions {
-			if path.Clean(f.Path) == path.Clean(f1.Path) {
-				if !checkFilterMatch(f.AllowedExtensions, f1.AllowedExtensions) ||
-					!checkFilterMatch(f.DeniedExtensions, f1.DeniedExtensions) {
-					return errors.New("file extensions contents mismatch")
-				}
-				found = true
-			}
-		}
-		if !found {
-			return errors.New("file extensions contents mismatch")
 		}
 	}
 	return nil

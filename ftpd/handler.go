@@ -113,11 +113,7 @@ func (c *Connection) RemoveAll(path string) error {
 func (c *Connection) Rename(oldname, newname string) error {
 	c.UpdateLastActivity()
 
-	if err := c.BaseConnection.Rename(oldname, newname); err != nil {
-		return err
-	}
-
-	return nil
+	return c.BaseConnection.Rename(oldname, newname)
 }
 
 // Stat returns a FileInfo describing the named file/directory, or an error,
@@ -301,13 +297,18 @@ func (c *Connection) downloadFile(fs vfs.Fs, fsPath, ftpPath string, offset int6
 		return nil, c.GetPermissionDeniedError()
 	}
 
+	if err := common.ExecutePreAction(&c.User, common.OperationPreDownload, fsPath, ftpPath, c.GetProtocol(), 0, 0); err != nil {
+		c.Log(logger.LevelDebug, "download for file %#v denied by pre action: %v", ftpPath, err)
+		return nil, c.GetPermissionDeniedError()
+	}
+
 	file, r, cancelFn, err := fs.Open(fsPath, offset)
 	if err != nil {
 		c.Log(logger.LevelWarn, "could not open file %#v for reading: %+v", fsPath, err)
 		return nil, c.GetFsError(fs, err)
 	}
 
-	baseTransfer := common.NewBaseTransfer(file, c.BaseConnection, cancelFn, fsPath, ftpPath, common.TransferDownload,
+	baseTransfer := common.NewBaseTransfer(file, c.BaseConnection, cancelFn, fsPath, fsPath, ftpPath, common.TransferDownload,
 		0, 0, 0, false, fs)
 	t := newTransfer(baseTransfer, nil, r, offset)
 
@@ -357,6 +358,10 @@ func (c *Connection) handleFTPUploadToNewFile(fs vfs.Fs, resolvedPath, filePath,
 		c.Log(logger.LevelInfo, "denying file write due to quota limits")
 		return nil, common.ErrQuotaExceeded
 	}
+	if err := common.ExecutePreAction(&c.User, common.OperationPreUpload, resolvedPath, requestPath, c.GetProtocol(), 0, 0); err != nil {
+		c.Log(logger.LevelDebug, "upload for file %#v denied by pre action: %v", requestPath, err)
+		return nil, c.GetPermissionDeniedError()
+	}
 	file, w, cancelFn, err := fs.Create(filePath, 0)
 	if err != nil {
 		c.Log(logger.LevelWarn, "error creating file %#v: %+v", resolvedPath, err)
@@ -368,7 +373,7 @@ func (c *Connection) handleFTPUploadToNewFile(fs vfs.Fs, resolvedPath, filePath,
 	// we can get an error only for resume
 	maxWriteSize, _ := c.GetMaxWriteSize(quotaResult, false, 0, fs.IsUploadResumeSupported())
 
-	baseTransfer := common.NewBaseTransfer(file, c.BaseConnection, cancelFn, resolvedPath, requestPath,
+	baseTransfer := common.NewBaseTransfer(file, c.BaseConnection, cancelFn, resolvedPath, filePath, requestPath,
 		common.TransferUpload, 0, 0, maxWriteSize, true, fs)
 	t := newTransfer(baseTransfer, w, nil, 0)
 
@@ -396,6 +401,10 @@ func (c *Connection) handleFTPUploadToExistingFile(fs vfs.Fs, flags int, resolve
 	if err != nil {
 		c.Log(logger.LevelDebug, "unable to get max write size: %v", err)
 		return nil, err
+	}
+	if err := common.ExecutePreAction(&c.User, common.OperationPreUpload, resolvedPath, requestPath, c.GetProtocol(), fileSize, flags); err != nil {
+		c.Log(logger.LevelDebug, "upload for file %#v denied by pre action: %v", requestPath, err)
+		return nil, c.GetPermissionDeniedError()
 	}
 
 	if common.Config.IsAtomicUploadEnabled() && fs.IsAtomicUploadSupported() {
@@ -440,7 +449,7 @@ func (c *Connection) handleFTPUploadToExistingFile(fs vfs.Fs, flags int, resolve
 
 	vfs.SetPathPermissions(fs, filePath, c.User.GetUID(), c.User.GetGID())
 
-	baseTransfer := common.NewBaseTransfer(file, c.BaseConnection, cancelFn, resolvedPath, requestPath,
+	baseTransfer := common.NewBaseTransfer(file, c.BaseConnection, cancelFn, resolvedPath, filePath, requestPath,
 		common.TransferUpload, minWriteOffset, initialSize, maxWriteSize, false, fs)
 	t := newTransfer(baseTransfer, w, nil, 0)
 

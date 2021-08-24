@@ -28,6 +28,9 @@ import (
 	"github.com/drakkan/sftpgo/version"
 )
 
+// using this mime type for directories improves compatibility with s3fs-fuse
+const s3DirMimeType = "application/x-directory"
+
 // S3Fs is a Fs implementation for AWS S3 compatible object storages
 type S3Fs struct {
 	connectionID string
@@ -48,7 +51,11 @@ func init() {
 // object storage
 func NewS3Fs(connectionID, localTempDir, mountPath string, config S3FsConfig) (Fs, error) {
 	if localTempDir == "" {
-		localTempDir = filepath.Clean(os.TempDir())
+		if tempPath != "" {
+			localTempDir = tempPath
+		} else {
+			localTempDir = filepath.Clean(os.TempDir())
+		}
 	}
 	fs := &S3Fs{
 		connectionID:   connectionID,
@@ -204,7 +211,7 @@ func (fs *S3Fs) Create(name string, flag int) (File, *PipeWriter, func(), error)
 		key := name
 		var contentType string
 		if flag == -1 {
-			contentType = dirMimeType
+			contentType = s3DirMimeType
 		} else {
 			contentType = mime.TypeByExtension(path.Ext(name))
 		}
@@ -263,7 +270,7 @@ func (fs *S3Fs) Rename(source, target string) error {
 	}
 	var contentType string
 	if fi.IsDir() {
-		contentType = dirMimeType
+		contentType = s3DirMimeType
 	} else {
 		contentType = mime.TypeByExtension(path.Ext(source))
 	}

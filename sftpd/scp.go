@@ -219,6 +219,13 @@ func (c *scpCommand) handleUploadFile(fs vfs.Fs, resolvedPath, filePath string, 
 		c.sendErrorMessage(fs, err)
 		return err
 	}
+	err := common.ExecutePreAction(&c.connection.User, common.OperationPreUpload, resolvedPath, requestPath, c.connection.GetProtocol(), fileSize, os.O_TRUNC)
+	if err != nil {
+		c.connection.Log(logger.LevelDebug, "upload for file %#v denied by pre action: %v", requestPath, err)
+		err = c.connection.GetPermissionDeniedError()
+		c.sendErrorMessage(fs, err)
+		return err
+	}
 
 	maxWriteSize, _ := c.connection.GetMaxWriteSize(quotaResult, false, fileSize, fs.IsUploadResumeSupported())
 
@@ -251,7 +258,7 @@ func (c *scpCommand) handleUploadFile(fs vfs.Fs, resolvedPath, filePath string, 
 
 	vfs.SetPathPermissions(fs, filePath, c.connection.User.GetUID(), c.connection.User.GetGID())
 
-	baseTransfer := common.NewBaseTransfer(file, c.connection.BaseConnection, cancelFn, resolvedPath, requestPath,
+	baseTransfer := common.NewBaseTransfer(file, c.connection.BaseConnection, cancelFn, resolvedPath, filePath, requestPath,
 		common.TransferUpload, 0, initialSize, maxWriteSize, isNewFile, fs)
 	t := newTransfer(baseTransfer, w, nil, nil)
 
@@ -507,6 +514,12 @@ func (c *scpCommand) handleDownload(filePath string) error {
 		return common.ErrPermissionDenied
 	}
 
+	if err := common.ExecutePreAction(&c.connection.User, common.OperationPreDownload, p, filePath, c.connection.GetProtocol(), 0, 0); err != nil {
+		c.connection.Log(logger.LevelDebug, "download for file %#v denied by pre action: %v", filePath, err)
+		c.sendErrorMessage(fs, common.ErrPermissionDenied)
+		return common.ErrPermissionDenied
+	}
+
 	file, r, cancelFn, err := fs.Open(p, 0)
 	if err != nil {
 		c.connection.Log(logger.LevelError, "could not open file %#v for reading: %v", p, err)
@@ -514,7 +527,7 @@ func (c *scpCommand) handleDownload(filePath string) error {
 		return err
 	}
 
-	baseTransfer := common.NewBaseTransfer(file, c.connection.BaseConnection, cancelFn, p, filePath,
+	baseTransfer := common.NewBaseTransfer(file, c.connection.BaseConnection, cancelFn, p, p, filePath,
 		common.TransferDownload, 0, 0, 0, false, fs)
 	t := newTransfer(baseTransfer, nil, r, nil)
 

@@ -108,16 +108,18 @@
             headers: {'X-CSRF-TOKEN' : '{{.CSRFToken}}'},
             timeout: 15000,
             success: function (result) {
-                table.button('delete:name').enable(true);
                 window.location.href = '{{.UsersURL}}';
             },
             error: function ($xhr, textStatus, errorThrown) {
-                table.button('delete:name').enable(true);
                 var txt = "Unable to delete the selected user";
                 if ($xhr) {
                     var json = $xhr.responseJSON;
                     if (json) {
-                        txt += ": " + json.error;
+                        if (json.message){
+                            txt += ": " + json.message;
+                        } else {
+                            txt += ": " + json.error;
+                        }
                     }
                 }
                 $('#errorTxt').text(txt);
@@ -199,13 +201,11 @@
             action: function (e, dt, node, config) {
                 dt.button('quota_scan:name').enable(false);
                 var username = dt.row({ selected: true }).data()[1];
-                var path = '{{.QuotaScanURL}}'
+                var path = '{{.QuotaScanURL}}'+ "/" + fixedEncodeURIComponent(username);
                 $.ajax({
                     url: path,
                     type: 'POST',
-                    dataType: 'json',
                     headers: {'X-CSRF-TOKEN' : '{{.CSRFToken}}'},
-                    data: JSON.stringify({ "username": username }),
                     timeout: 15000,
                     success: function (result) {
                         dt.button('quota_scan:name').enable(true);

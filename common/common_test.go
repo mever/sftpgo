@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -129,8 +130,11 @@ func TestDefenderIntegration(t *testing.T) {
 	assert.False(t, IsBanned(ip))
 
 	assert.Nil(t, GetDefenderBanTime(ip))
-	assert.False(t, Unban(ip))
+	assert.False(t, DeleteDefenderHost(ip))
 	assert.Equal(t, 0, GetDefenderScore(ip))
+	_, err := GetDefenderHost(ip)
+	assert.Error(t, err)
+	assert.Nil(t, GetDefenderHosts())
 
 	Config.DefenderConfig = DefenderConfig{
 		Enabled:          true,
@@ -143,7 +147,7 @@ func TestDefenderIntegration(t *testing.T) {
 		EntriesSoftLimit: 100,
 		EntriesHardLimit: 150,
 	}
-	err := Initialize(Config)
+	err = Initialize(Config)
 	assert.Error(t, err)
 	Config.DefenderConfig.Threshold = 3
 	err = Initialize(Config)
@@ -153,16 +157,27 @@ func TestDefenderIntegration(t *testing.T) {
 	AddDefenderEvent(ip, HostEventNoLoginTried)
 	assert.False(t, IsBanned(ip))
 	assert.Equal(t, 2, GetDefenderScore(ip))
-	assert.False(t, Unban(ip))
+	entry, err := GetDefenderHost(ip)
+	assert.NoError(t, err)
+	asJSON, err := json.Marshal(&entry)
+	assert.NoError(t, err)
+	assert.Equal(t, `{"id":"3132372e312e312e31","ip":"127.1.1.1","score":2}`, string(asJSON), "entry %v", entry)
+	assert.True(t, DeleteDefenderHost(ip))
 	assert.Nil(t, GetDefenderBanTime(ip))
 
 	AddDefenderEvent(ip, HostEventLoginFailed)
+	AddDefenderEvent(ip, HostEventNoLoginTried)
 	assert.True(t, IsBanned(ip))
 	assert.Equal(t, 0, GetDefenderScore(ip))
 	assert.NotNil(t, GetDefenderBanTime(ip))
-	assert.True(t, Unban(ip))
+	assert.Len(t, GetDefenderHosts(), 1)
+	entry, err = GetDefenderHost(ip)
+	assert.NoError(t, err)
+	assert.False(t, entry.BanTime.IsZero())
+	assert.True(t, DeleteDefenderHost(ip))
+	assert.Len(t, GetDefenderHosts(), 0)
 	assert.Nil(t, GetDefenderBanTime(ip))
-	assert.False(t, Unban(ip))
+	assert.False(t, DeleteDefenderHost(ip))
 
 	Config = configCopy
 }
@@ -239,7 +254,7 @@ func TestMaxConnections(t *testing.T) {
 	Config.MaxPerHostConnections = perHost
 
 	assert.True(t, Connections.IsNewConnectionAllowed(ipAddr))
-	c := NewBaseConnection("id", ProtocolSFTP, dataprovider.User{})
+	c := NewBaseConnection("id", ProtocolSFTP, "", dataprovider.User{})
 	fakeConn := &fakeConnection{
 		BaseConnection: c,
 	}
@@ -310,7 +325,7 @@ func TestIdleConnections(t *testing.T) {
 	user := dataprovider.User{
 		Username: username,
 	}
-	c := NewBaseConnection(sshConn1.id+"_1", ProtocolSFTP, user)
+	c := NewBaseConnection(sshConn1.id+"_1", ProtocolSFTP, "", user)
 	c.lastActivity = time.Now().Add(-24 * time.Hour).UnixNano()
 	fakeConn := &fakeConnection{
 		BaseConnection: c,
@@ -322,7 +337,7 @@ func TestIdleConnections(t *testing.T) {
 	Connections.AddSSHConnection(sshConn1)
 	Connections.Add(fakeConn)
 	assert.Equal(t, Connections.GetActiveSessions(username), 1)
-	c = NewBaseConnection(sshConn2.id+"_1", ProtocolSSH, user)
+	c = NewBaseConnection(sshConn2.id+"_1", ProtocolSSH, "", user)
 	fakeConn = &fakeConnection{
 		BaseConnection: c,
 	}
@@ -330,7 +345,7 @@ func TestIdleConnections(t *testing.T) {
 	Connections.Add(fakeConn)
 	assert.Equal(t, Connections.GetActiveSessions(username), 2)
 
-	cFTP := NewBaseConnection("id2", ProtocolFTP, dataprovider.User{})
+	cFTP := NewBaseConnection("id2", ProtocolFTP, "", dataprovider.User{})
 	cFTP.lastActivity = time.Now().UnixNano()
 	fakeConn = &fakeConnection{
 		BaseConnection: cFTP,
@@ -370,7 +385,7 @@ func TestIdleConnections(t *testing.T) {
 }
 
 func TestCloseConnection(t *testing.T) {
-	c := NewBaseConnection("id", ProtocolSFTP, dataprovider.User{})
+	c := NewBaseConnection("id", ProtocolSFTP, "", dataprovider.User{})
 	fakeConn := &fakeConnection{
 		BaseConnection: c,
 	}
@@ -386,7 +401,7 @@ func TestCloseConnection(t *testing.T) {
 }
 
 func TestSwapConnection(t *testing.T) {
-	c := NewBaseConnection("id", ProtocolFTP, dataprovider.User{})
+	c := NewBaseConnection("id", ProtocolFTP, "", dataprovider.User{})
 	fakeConn := &fakeConnection{
 		BaseConnection: c,
 	}
@@ -394,7 +409,7 @@ func TestSwapConnection(t *testing.T) {
 	if assert.Len(t, Connections.GetStats(), 1) {
 		assert.Equal(t, "", Connections.GetStats()[0].Username)
 	}
-	c = NewBaseConnection("id", ProtocolFTP, dataprovider.User{
+	c = NewBaseConnection("id", ProtocolFTP, "", dataprovider.User{
 		Username: userTestUsername,
 	})
 	fakeConn = &fakeConnection{
@@ -431,25 +446,25 @@ func TestConnectionStatus(t *testing.T) {
 		Username: username,
 	}
 	fs := vfs.NewOsFs("", os.TempDir(), "")
-	c1 := NewBaseConnection("id1", ProtocolSFTP, user)
+	c1 := NewBaseConnection("id1", ProtocolSFTP, "", user)
 	fakeConn1 := &fakeConnection{
 		BaseConnection: c1,
 	}
-	t1 := NewBaseTransfer(nil, c1, nil, "/p1", "/r1", TransferUpload, 0, 0, 0, true, fs)
+	t1 := NewBaseTransfer(nil, c1, nil, "/p1", "/p1", "/r1", TransferUpload, 0, 0, 0, true, fs)
 	t1.BytesReceived = 123
-	t2 := NewBaseTransfer(nil, c1, nil, "/p2", "/r2", TransferDownload, 0, 0, 0, true, fs)
+	t2 := NewBaseTransfer(nil, c1, nil, "/p2", "/p2", "/r2", TransferDownload, 0, 0, 0, true, fs)
 	t2.BytesSent = 456
-	c2 := NewBaseConnection("id2", ProtocolSSH, user)
+	c2 := NewBaseConnection("id2", ProtocolSSH, "", user)
 	fakeConn2 := &fakeConnection{
 		BaseConnection: c2,
 		command:        "md5sum",
 	}
-	c3 := NewBaseConnection("id3", ProtocolWebDAV, user)
+	c3 := NewBaseConnection("id3", ProtocolWebDAV, "", user)
 	fakeConn3 := &fakeConnection{
 		BaseConnection: c3,
 		command:        "PROPFIND",
 	}
-	t3 := NewBaseTransfer(nil, c3, nil, "/p2", "/r2", TransferDownload, 0, 0, 0, true, fs)
+	t3 := NewBaseTransfer(nil, c3, nil, "/p2", "/p2", "/r2", TransferDownload, 0, 0, 0, true, fs)
 	Connections.Add(fakeConn1)
 	Connections.Add(fakeConn2)
 	Connections.Add(fakeConn3)
@@ -677,7 +692,7 @@ func TestCachedFs(t *testing.T) {
 	user := dataprovider.User{
 		HomeDir: filepath.Clean(os.TempDir()),
 	}
-	conn := NewBaseConnection("id", ProtocolSFTP, user)
+	conn := NewBaseConnection("id", ProtocolSFTP, "", user)
 	// changing the user should not affect the connection
 	user.HomeDir = filepath.Join(os.TempDir(), "temp")
 	err := os.Mkdir(user.HomeDir, os.ModePerm)

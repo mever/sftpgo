@@ -52,6 +52,7 @@ const (
 	templateMessage      = "message.html"
 	templateStatus       = "status.html"
 	templateLogin        = "login.html"
+	templateDefender     = "defender.html"
 	templateChangePwd    = "changepwd.html"
 	templateMaintenance  = "maintenance.html"
 	templateSetup        = "adminsetup.html"
@@ -62,6 +63,7 @@ const (
 	pageFoldersTitle     = "Folders"
 	pageChangePwdTitle   = "Change password"
 	pageMaintenanceTitle = "Maintenance"
+	pageDefenderTitle    = "Defender"
 	pageSetupTitle       = "Create first admin user"
 	defaultQueryLimit    = 500
 )
@@ -83,6 +85,7 @@ type basePage struct {
 	FoldersURL         string
 	FolderURL          string
 	FolderTemplateURL  string
+	DefenderURL        string
 	LogoutURL          string
 	ChangeAdminPwdURL  string
 	FolderQuotaScanURL string
@@ -95,8 +98,10 @@ type basePage struct {
 	FoldersTitle       string
 	StatusTitle        string
 	MaintenanceTitle   string
+	DefenderTitle      string
 	Version            string
 	CSRFToken          string
+	HasDefender        bool
 	LoggedAdmin        *dataprovider.Admin
 }
 
@@ -137,6 +142,7 @@ type userPage struct {
 	RootDirPerms      []string
 	RedactedSecret    string
 	Mode              userPageMode
+	VirtualFolders    []vfs.BaseVirtualFolder
 }
 
 type adminPage struct {
@@ -156,6 +162,11 @@ type maintenancePage struct {
 	BackupPath  string
 	RestorePath string
 	Error       string
+}
+
+type defenderHostsPage struct {
+	basePage
+	DefenderHostsURL string
 }
 
 type setupPage struct {
@@ -233,6 +244,10 @@ func loadAdminTemplates(templatesPath string) {
 		filepath.Join(templatesPath, templateAdminDir, templateBase),
 		filepath.Join(templatesPath, templateAdminDir, templateMaintenance),
 	}
+	defenderPath := []string{
+		filepath.Join(templatesPath, templateAdminDir, templateBase),
+		filepath.Join(templatesPath, templateAdminDir, templateDefender),
+	}
 	setupPath := []string{
 		filepath.Join(templatesPath, templateAdminDir, templateSetup),
 	}
@@ -248,6 +263,7 @@ func loadAdminTemplates(templatesPath string) {
 	loginTmpl := utils.LoadTemplate(template.ParseFiles(loginPath...))
 	changePwdTmpl := utils.LoadTemplate(template.ParseFiles(changePwdPaths...))
 	maintenanceTmpl := utils.LoadTemplate(template.ParseFiles(maintenancePath...))
+	defenderTmpl := utils.LoadTemplate(template.ParseFiles(defenderPath...))
 	setupTmpl := utils.LoadTemplate(template.ParseFiles(setupPath...))
 
 	adminTemplates[templateUsers] = usersTmpl
@@ -262,6 +278,7 @@ func loadAdminTemplates(templatesPath string) {
 	adminTemplates[templateLogin] = loginTmpl
 	adminTemplates[templateChangePwd] = changePwdTmpl
 	adminTemplates[templateMaintenance] = maintenanceTmpl
+	adminTemplates[templateDefender] = defenderTmpl
 	adminTemplates[templateSetup] = setupTmpl
 }
 
@@ -281,6 +298,7 @@ func getBasePageData(title, currentURL string, r *http.Request) basePage {
 		FoldersURL:         webFoldersPath,
 		FolderURL:          webFolderPath,
 		FolderTemplateURL:  webTemplateFolder,
+		DefenderURL:        webDefenderPath,
 		LogoutURL:          webLogoutPath,
 		ChangeAdminPwdURL:  webChangeAdminPwdPath,
 		QuotaScanURL:       webQuotaScanPath,
@@ -295,8 +313,10 @@ func getBasePageData(title, currentURL string, r *http.Request) basePage {
 		FoldersTitle:       pageFoldersTitle,
 		StatusTitle:        pageStatusTitle,
 		MaintenanceTitle:   pageMaintenanceTitle,
+		DefenderTitle:      pageDefenderTitle,
 		Version:            version.GetAsString(),
 		LoggedAdmin:        getAdminFromToken(r),
+		HasDefender:        common.Config.DefenderConfig.Enabled,
 		CSRFToken:          csrfToken,
 	}
 }
@@ -388,6 +408,10 @@ func renderAddUpdateAdminPage(w http.ResponseWriter, r *http.Request, admin *dat
 }
 
 func renderUserPage(w http.ResponseWriter, r *http.Request, user *dataprovider.User, mode userPageMode, error string) {
+	folders, err := getWebVirtualFolders(w, r, defaultQueryLimit)
+	if err != nil {
+		return
+	}
 	user.SetEmptySecretsIfNil()
 	var title, currentURL string
 	switch mode {
@@ -415,6 +439,7 @@ func renderUserPage(w http.ResponseWriter, r *http.Request, user *dataprovider.U
 		ValidProtocols:    dataprovider.ValidProtocols,
 		WebClientOptions:  dataprovider.WebClientOptions,
 		RootDirPerms:      user.GetPermissionsForPath("/"),
+		VirtualFolders:    folders,
 	}
 	renderAdminTemplate(w, templateUser, data)
 }
@@ -446,9 +471,13 @@ func renderFolderPage(w http.ResponseWriter, r *http.Request, folder vfs.BaseVir
 
 func getFoldersForTemplate(r *http.Request) []string {
 	var res []string
-	formValue := r.Form.Get("folders")
+	folderNames := r.Form["tpl_foldername"]
 	folders := make(map[string]bool)
-	for _, name := range getSliceFromDelimitedValues(formValue, "\n") {
+	for _, name := range folderNames {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
 		if _, ok := folders[name]; ok {
 			continue
 		}
@@ -460,110 +489,127 @@ func getFoldersForTemplate(r *http.Request) []string {
 
 func getUsersForTemplate(r *http.Request) []userTemplateFields {
 	var res []userTemplateFields
-	formValue := r.Form.Get("users")
-	users := make(map[string]bool)
-	for _, cleaned := range getSliceFromDelimitedValues(formValue, "\n") {
-		if strings.Contains(cleaned, "::") {
-			mapping := strings.Split(cleaned, "::")
-			if len(mapping) > 1 {
-				username := strings.TrimSpace(mapping[0])
-				password := strings.TrimSpace(mapping[1])
-				var publicKey string
-				if len(mapping) > 2 {
-					publicKey = strings.TrimSpace(mapping[2])
-				}
-				if username == "" || (password == "" && publicKey == "") {
-					continue
-				}
-				if _, ok := users[username]; ok {
-					continue
-				}
+	tplUsernames := r.Form["tpl_username"]
+	tplPasswords := r.Form["tpl_password"]
+	tplPublicKeys := r.Form["tpl_public_keys"]
 
-				users[username] = true
-				res = append(res, userTemplateFields{
-					Username:  username,
-					Password:  password,
-					PublicKey: publicKey,
-				})
-			}
+	users := make(map[string]bool)
+	for idx, username := range tplUsernames {
+		username = strings.TrimSpace(username)
+		password := ""
+		publicKey := ""
+		if len(tplPasswords) > idx {
+			password = strings.TrimSpace(tplPasswords[idx])
 		}
+		if len(tplPublicKeys) > idx {
+			publicKey = strings.TrimSpace(tplPublicKeys[idx])
+		}
+		if username == "" || (password == "" && publicKey == "") {
+			continue
+		}
+		if _, ok := users[username]; ok {
+			continue
+		}
+
+		users[username] = true
+		res = append(res, userTemplateFields{
+			Username:  username,
+			Password:  password,
+			PublicKey: publicKey,
+		})
 	}
+
 	return res
 }
 
 func getVirtualFoldersFromPostFields(r *http.Request) []vfs.VirtualFolder {
 	var virtualFolders []vfs.VirtualFolder
-	formValue := r.Form.Get("virtual_folders")
-	for _, cleaned := range getSliceFromDelimitedValues(formValue, "\n") {
-		if strings.Contains(cleaned, "::") {
-			mapping := strings.Split(cleaned, "::")
-			if len(mapping) > 1 {
-				vfolder := vfs.VirtualFolder{
-					BaseVirtualFolder: vfs.BaseVirtualFolder{
-						Name: strings.TrimSpace(mapping[1]),
-					},
-					VirtualPath: strings.TrimSpace(mapping[0]),
-					QuotaFiles:  -1,
-					QuotaSize:   -1,
-				}
-				if len(mapping) > 2 {
-					quotaFiles, err := strconv.Atoi(strings.TrimSpace(mapping[2]))
-					if err == nil {
-						vfolder.QuotaFiles = quotaFiles
-					}
-				}
-				if len(mapping) > 3 {
-					quotaSize, err := strconv.ParseInt(strings.TrimSpace(mapping[3]), 10, 64)
-					if err == nil {
-						vfolder.QuotaSize = quotaSize
-					}
-				}
-				virtualFolders = append(virtualFolders, vfolder)
+	folderPaths := r.Form["vfolder_path"]
+	folderNames := r.Form["vfolder_name"]
+	folderQuotaSizes := r.Form["vfolder_quota_size"]
+	folderQuotaFiles := r.Form["vfolder_quota_files"]
+	for idx, p := range folderPaths {
+		p = strings.TrimSpace(p)
+		name := ""
+		if len(folderNames) > idx {
+			name = folderNames[idx]
+		}
+		if p != "" && name != "" {
+			vfolder := vfs.VirtualFolder{
+				BaseVirtualFolder: vfs.BaseVirtualFolder{
+					Name: name,
+				},
+				VirtualPath: p,
+				QuotaFiles:  -1,
+				QuotaSize:   -1,
 			}
+			if len(folderQuotaSizes) > idx {
+				quotaSize, err := strconv.ParseInt(strings.TrimSpace(folderQuotaSizes[idx]), 10, 64)
+				if err == nil {
+					vfolder.QuotaSize = quotaSize
+				}
+			}
+			if len(folderQuotaFiles) > idx {
+				quotaFiles, err := strconv.Atoi(strings.TrimSpace(folderQuotaFiles[idx]))
+				if err == nil {
+					vfolder.QuotaFiles = quotaFiles
+				}
+			}
+			virtualFolders = append(virtualFolders, vfolder)
 		}
 	}
+
 	return virtualFolders
 }
 
 func getUserPermissionsFromPostFields(r *http.Request) map[string][]string {
 	permissions := make(map[string][]string)
 	permissions["/"] = r.Form["permissions"]
-	subDirsPermsValue := r.Form.Get("sub_dirs_permissions")
-	for _, cleaned := range getSliceFromDelimitedValues(subDirsPermsValue, "\n") {
-		if strings.Contains(cleaned, "::") {
-			dirPerms := strings.Split(cleaned, "::")
-			if len(dirPerms) > 1 {
-				dir := dirPerms[0]
-				dir = strings.TrimSpace(dir)
-				perms := []string{}
-				for _, p := range strings.Split(dirPerms[1], ",") {
-					cleanedPerm := strings.TrimSpace(p)
-					if cleanedPerm != "" {
-						perms = append(perms, cleanedPerm)
-					}
-				}
-				if dir != "" {
-					permissions[dir] = perms
+
+	for k := range r.Form {
+		if strings.HasPrefix(k, "sub_perm_path") {
+			p := strings.TrimSpace(r.Form.Get(k))
+			if p != "" {
+				idx := strings.TrimPrefix(k, "sub_perm_path")
+				permissions[p] = r.Form[fmt.Sprintf("sub_perm_permissions%v", idx)]
+			}
+		}
+	}
+
+	return permissions
+}
+
+func getFilePatternsFromPostField(r *http.Request) []dataprovider.PatternsFilter {
+	var result []dataprovider.PatternsFilter
+
+	allowedPatterns := make(map[string][]string)
+	deniedPatterns := make(map[string][]string)
+
+	for k := range r.Form {
+		if strings.HasPrefix(k, "pattern_path") {
+			p := strings.TrimSpace(r.Form.Get(k))
+			idx := strings.TrimPrefix(k, "pattern_path")
+			filters := strings.TrimSpace(r.Form.Get(fmt.Sprintf("patterns%v", idx)))
+			filters = strings.ReplaceAll(filters, " ", "")
+			patternType := r.Form.Get(fmt.Sprintf("pattern_type%v", idx))
+			if p != "" && filters != "" {
+				if patternType == "allowed" {
+					allowedPatterns[p] = append(allowedPatterns[p], strings.Split(filters, ",")...)
+				} else {
+					deniedPatterns[p] = append(deniedPatterns[p], strings.Split(filters, ",")...)
 				}
 			}
 		}
 	}
-	return permissions
-}
-
-func getFilePatternsFromPostField(valueAllowed, valuesDenied string) []dataprovider.PatternsFilter {
-	var result []dataprovider.PatternsFilter
-	allowedPatterns := getListFromPostFields(valueAllowed)
-	deniedPatterns := getListFromPostFields(valuesDenied)
 
 	for dirAllowed, allowPatterns := range allowedPatterns {
 		filter := dataprovider.PatternsFilter{
 			Path:            dirAllowed,
-			AllowedPatterns: allowPatterns,
+			AllowedPatterns: utils.RemoveDuplicates(allowPatterns),
 		}
 		for dirDenied, denPatterns := range deniedPatterns {
 			if dirAllowed == dirDenied {
-				filter.DeniedPatterns = denPatterns
+				filter.DeniedPatterns = utils.RemoveDuplicates(denPatterns)
 				break
 			}
 		}
@@ -587,50 +633,13 @@ func getFilePatternsFromPostField(valueAllowed, valuesDenied string) []dataprovi
 	return result
 }
 
-func getFileExtensionsFromPostField(valueAllowed, valuesDenied string) []dataprovider.ExtensionsFilter {
-	var result []dataprovider.ExtensionsFilter
-	allowedExtensions := getListFromPostFields(valueAllowed)
-	deniedExtensions := getListFromPostFields(valuesDenied)
-
-	for dirAllowed, allowedExts := range allowedExtensions {
-		filter := dataprovider.ExtensionsFilter{
-			Path:              dirAllowed,
-			AllowedExtensions: allowedExts,
-		}
-		for dirDenied, deniedExts := range deniedExtensions {
-			if dirAllowed == dirDenied {
-				filter.DeniedExtensions = deniedExts
-				break
-			}
-		}
-		result = append(result, filter)
-	}
-	for dirDenied, deniedExts := range deniedExtensions {
-		found := false
-		for _, res := range result {
-			if res.Path == dirDenied {
-				found = true
-				break
-			}
-		}
-		if !found {
-			result = append(result, dataprovider.ExtensionsFilter{
-				Path:             dirDenied,
-				DeniedExtensions: deniedExts,
-			})
-		}
-	}
-	return result
-}
-
 func getFiltersFromUserPostFields(r *http.Request) dataprovider.UserFilters {
 	var filters dataprovider.UserFilters
 	filters.AllowedIP = getSliceFromDelimitedValues(r.Form.Get("allowed_ip"), ",")
 	filters.DeniedIP = getSliceFromDelimitedValues(r.Form.Get("denied_ip"), ",")
 	filters.DeniedLoginMethods = r.Form["ssh_login_methods"]
 	filters.DeniedProtocols = r.Form["denied_protocols"]
-	filters.FileExtensions = getFileExtensionsFromPostField(r.Form.Get("allowed_extensions"), r.Form.Get("denied_extensions"))
-	filters.FilePatterns = getFilePatternsFromPostField(r.Form.Get("allowed_patterns"), r.Form.Get("denied_patterns"))
+	filters.FilePatterns = getFilePatternsFromPostField(r)
 	filters.TLSUsername = dataprovider.TLSUsername(r.Form.Get("tls_username"))
 	filters.WebClient = r.Form["web_client_options"]
 	hooks := r.Form["hooks"]
@@ -738,7 +747,7 @@ func getAzureConfig(r *http.Request) (vfs.AzBlobFsConfig, error) {
 	config.Container = r.Form.Get("az_container")
 	config.AccountName = r.Form.Get("az_account_name")
 	config.AccountKey = getSecretFromFormField(r, "az_account_key")
-	config.SASURL = r.Form.Get("az_sas_url")
+	config.SASURL = getSecretFromFormField(r, "az_sas_url")
 	config.Endpoint = r.Form.Get("az_endpoint")
 	config.KeyPrefix = r.Form.Get("az_key_prefix")
 	config.AccessTier = r.Form.Get("az_access_tier")
@@ -945,8 +954,6 @@ func getUserFromPostFields(r *http.Request) (dataprovider.User, error) {
 	if err != nil {
 		return user, err
 	}
-	publicKeysFormValue := r.Form.Get("public_keys")
-	publicKeys := getSliceFromDelimitedValues(publicKeysFormValue, "\n")
 	uid, err := strconv.Atoi(r.Form.Get("uid"))
 	if err != nil {
 		return user, err
@@ -995,7 +1002,7 @@ func getUserFromPostFields(r *http.Request) (dataprovider.User, error) {
 	user = dataprovider.User{
 		Username:          r.Form.Get("username"),
 		Password:          r.Form.Get("password"),
-		PublicKeys:        publicKeys,
+		PublicKeys:        r.Form["public_keys"],
 		HomeDir:           r.Form.Get("home_dir"),
 		VirtualFolders:    getVirtualFoldersFromPostFields(r),
 		UID:               uid,
@@ -1238,6 +1245,15 @@ func handleWebUpdateAdminPost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, webAdminsPath, http.StatusSeeOther)
 }
 
+func handleWebDefenderPage(w http.ResponseWriter, r *http.Request) {
+	data := defenderHostsPage{
+		basePage:         getBasePageData(pageDefenderTitle, webDefenderPath, r),
+		DefenderHostsURL: webDefenderHostsPath,
+	}
+
+	renderAdminTemplate(w, templateDefender, data)
+}
+
 func handleGetWebUsers(w http.ResponseWriter, r *http.Request) {
 	limit := defaultQueryLimit
 	if _, ok := r.URL.Query()["qlimit"]; ok {
@@ -1286,7 +1302,7 @@ func handleWebTemplateFolderGet(w http.ResponseWriter, r *http.Request) {
 func handleWebTemplateFolderPost(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestSize)
 	templateFolder := vfs.BaseVirtualFolder{}
-	err := r.ParseForm()
+	err := r.ParseMultipartForm(maxRequestSize)
 	if err != nil {
 		renderMessagePage(w, r, "Error parsing folders fields", "", http.StatusBadRequest, err, "")
 		return
@@ -1464,8 +1480,8 @@ func handleWebUpdateUserPost(w http.ResponseWriter, r *http.Request) {
 		updatedUser.Password = user.Password
 	}
 	updateEncryptedSecrets(&updatedUser.FsConfig, user.FsConfig.S3Config.AccessSecret, user.FsConfig.AzBlobConfig.AccountKey,
-		user.FsConfig.GCSConfig.Credentials, user.FsConfig.CryptConfig.Passphrase, user.FsConfig.SFTPConfig.Password,
-		user.FsConfig.SFTPConfig.PrivateKey)
+		user.FsConfig.AzBlobConfig.SASURL, user.FsConfig.GCSConfig.Credentials, user.FsConfig.CryptConfig.Passphrase,
+		user.FsConfig.SFTPConfig.Password, user.FsConfig.SFTPConfig.PrivateKey)
 
 	err = dataprovider.UpdateUser(&updatedUser)
 	if err == nil {
@@ -1576,8 +1592,8 @@ func handleWebUpdateFolderPost(w http.ResponseWriter, r *http.Request) {
 	updatedFolder.FsConfig = fsConfig
 	updatedFolder.FsConfig.SetEmptySecretsIfNil()
 	updateEncryptedSecrets(&updatedFolder.FsConfig, folder.FsConfig.S3Config.AccessSecret, folder.FsConfig.AzBlobConfig.AccountKey,
-		folder.FsConfig.GCSConfig.Credentials, folder.FsConfig.CryptConfig.Passphrase, folder.FsConfig.SFTPConfig.Password,
-		folder.FsConfig.SFTPConfig.PrivateKey)
+		folder.FsConfig.AzBlobConfig.SASURL, folder.FsConfig.GCSConfig.Credentials, folder.FsConfig.CryptConfig.Passphrase,
+		folder.FsConfig.SFTPConfig.Password, folder.FsConfig.SFTPConfig.PrivateKey)
 
 	err = dataprovider.UpdateFolder(updatedFolder, folder.Users)
 	if err != nil {
@@ -1585,6 +1601,22 @@ func handleWebUpdateFolderPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, webFoldersPath, http.StatusSeeOther)
+}
+
+func getWebVirtualFolders(w http.ResponseWriter, r *http.Request, limit int) ([]vfs.BaseVirtualFolder, error) {
+	folders := make([]vfs.BaseVirtualFolder, 0, limit)
+	for {
+		f, err := dataprovider.GetFolders(limit, len(folders), dataprovider.OrderASC)
+		if err != nil {
+			renderInternalServerErrorPage(w, r, err)
+			return folders, err
+		}
+		folders = append(folders, f...)
+		if len(f) < limit {
+			break
+		}
+	}
+	return folders, nil
 }
 
 func handleWebGetFolders(w http.ResponseWriter, r *http.Request) {
@@ -1596,17 +1628,9 @@ func handleWebGetFolders(w http.ResponseWriter, r *http.Request) {
 			limit = defaultQueryLimit
 		}
 	}
-	folders := make([]vfs.BaseVirtualFolder, 0, limit)
-	for {
-		f, err := dataprovider.GetFolders(limit, len(folders), dataprovider.OrderASC)
-		if err != nil {
-			renderInternalServerErrorPage(w, r, err)
-			return
-		}
-		folders = append(folders, f...)
-		if len(f) < limit {
-			break
-		}
+	folders, err := getWebVirtualFolders(w, r, limit)
+	if err != nil {
+		return
 	}
 
 	data := foldersPage{
