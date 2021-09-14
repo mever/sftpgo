@@ -509,7 +509,7 @@ func getErrorFromStatus(b []byte) error {
 
 	s := Status{Type: StatusTypeUnknown}
 	if er := json.Unmarshal(b, &s); er != nil {
-		return er
+		return errors.Wrapf(er, "failed to parse data as JSON (%s)", b)
 	}
 
 	if s.Type == StatusTypeError {
