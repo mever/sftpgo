@@ -113,7 +113,11 @@ func (c *Connection) RemoveAll(ctx context.Context, name string) error {
 
 // OpenFile opens the named file with specified flag.
 // This method is used for uploads and downloads but also for Stat and Readdir
-func (c *Connection) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (webdav.File, error) {
+func (c *Connection) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (f webdav.File, retErr error) {
+	defer func() {
+		retErr = common.FirstError(c.BaseConnection.RecoverPanic(recover()), retErr)
+	}()
+
 	c.UpdateLastActivity()
 
 	name = utils.CleanPath(name)

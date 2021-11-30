@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -205,7 +206,11 @@ func (c *BaseConnection) truncateOpenHandle(fsPath string, size int64) (int64, e
 }
 
 // ListDir reads the directory matching virtualPath and returns a list of directory entries
-func (c *BaseConnection) ListDir(virtualPath string) ([]os.FileInfo, error) {
+func (c *BaseConnection) ListDir(virtualPath string) (fi []os.FileInfo, retErr error) {
+	defer func() {
+		retErr = FirstError(c.RecoverPanic(recover()), retErr)
+	}()
+
 	if !c.User.HasPerm(dataprovider.PermListItems, virtualPath) {
 		return nil, c.GetPermissionDeniedError()
 	}
@@ -222,7 +227,11 @@ func (c *BaseConnection) ListDir(virtualPath string) ([]os.FileInfo, error) {
 }
 
 // CreateDir creates a new directory at the specified fsPath
-func (c *BaseConnection) CreateDir(virtualPath string) error {
+func (c *BaseConnection) CreateDir(virtualPath string) (retErr error) {
+	defer func() {
+		retErr = FirstError(c.RecoverPanic(recover()), retErr)
+	}()
+
 	if !c.User.HasPerm(dataprovider.PermCreateDirs, path.Dir(virtualPath)) {
 		return c.GetPermissionDeniedError()
 	}
@@ -257,7 +266,11 @@ func (c *BaseConnection) IsRemoveFileAllowed(virtualPath string) error {
 }
 
 // RemoveFile removes a file at the specified fsPath
-func (c *BaseConnection) RemoveFile(fs vfs.Fs, fsPath, virtualPath string, info os.FileInfo) error {
+func (c *BaseConnection) RemoveFile(fs vfs.Fs, fsPath, virtualPath string, info os.FileInfo) (retErr error) {
+	defer func() {
+		retErr = FirstError(c.RecoverPanic(recover()), retErr)
+	}()
+
 	if err := c.IsRemoveFileAllowed(virtualPath); err != nil {
 		return err
 	}
@@ -316,7 +329,11 @@ func (c *BaseConnection) IsRemoveDirAllowed(fs vfs.Fs, fsPath, virtualPath strin
 }
 
 // RemoveDir removes a directory at the specified fsPath
-func (c *BaseConnection) RemoveDir(virtualPath string) error {
+func (c *BaseConnection) RemoveDir(virtualPath string) (retErr error) {
+	defer func() {
+		retErr = FirstError(c.RecoverPanic(recover()), retErr)
+	}()
+
 	fs, fsPath, err := c.GetFsAndResolvedPath(virtualPath)
 	if err != nil {
 		return err
@@ -349,7 +366,11 @@ func (c *BaseConnection) RemoveDir(virtualPath string) error {
 }
 
 // Rename renames (moves) virtualSourcePath to virtualTargetPath
-func (c *BaseConnection) Rename(virtualSourcePath, virtualTargetPath string) error {
+func (c *BaseConnection) Rename(virtualSourcePath, virtualTargetPath string) (retErr error) {
+	defer func() {
+		retErr = FirstError(c.RecoverPanic(recover()), retErr)
+	}()
+
 	fsSrc, fsSourcePath, err := c.GetFsAndResolvedPath(virtualSourcePath)
 	if err != nil {
 		return err
@@ -411,7 +432,11 @@ func (c *BaseConnection) Rename(virtualSourcePath, virtualTargetPath string) err
 }
 
 // CreateSymlink creates fsTargetPath as a symbolic link to fsSourcePath
-func (c *BaseConnection) CreateSymlink(virtualSourcePath, virtualTargetPath string) error {
+func (c *BaseConnection) CreateSymlink(virtualSourcePath, virtualTargetPath string) (retErr error) {
+	defer func() {
+		retErr = FirstError(c.RecoverPanic(recover()), retErr)
+	}()
+
 	if c.isCrossFoldersRequest(virtualSourcePath, virtualTargetPath) {
 		c.Log(logger.LevelWarn, "cross folder symlink is not supported, src: %v dst: %v", virtualSourcePath, virtualTargetPath)
 		return c.GetOpUnsupportedError()
@@ -456,7 +481,11 @@ func (c *BaseConnection) getPathForSetStatPerms(fs vfs.Fs, fsPath, virtualPath s
 }
 
 // DoStat execute a Stat if mode = 0, Lstat if mode = 1
-func (c *BaseConnection) DoStat(virtualPath string, mode int) (os.FileInfo, error) {
+func (c *BaseConnection) DoStat(virtualPath string, mode int) (fi os.FileInfo, retErr error) {
+	defer func() {
+		retErr = FirstError(c.RecoverPanic(recover()), retErr)
+	}()
+
 	// for some vfs we don't create intermediary folders so we cannot simply check
 	// if virtualPath is a virtual folder
 	vfolders := c.User.GetVirtualFoldersInPath(path.Dir(virtualPath))
@@ -511,7 +540,11 @@ func (c *BaseConnection) handleChmod(fs vfs.Fs, fsPath, pathForPerms string, att
 	return nil
 }
 
-func (c *BaseConnection) handleChown(fs vfs.Fs, fsPath, pathForPerms string, attributes *StatAttributes) error {
+func (c *BaseConnection) handleChown(fs vfs.Fs, fsPath, pathForPerms string, attributes *StatAttributes) (retErr error) {
+	defer func() {
+		retErr = FirstError(c.RecoverPanic(recover()), retErr)
+	}()
+
 	if !c.User.HasPerm(dataprovider.PermChown, pathForPerms) {
 		return c.GetPermissionDeniedError()
 	}
@@ -548,7 +581,11 @@ func (c *BaseConnection) handleChtimes(fs vfs.Fs, fsPath, pathForPerms string, a
 }
 
 // SetStat set StatAttributes for the specified fsPath
-func (c *BaseConnection) SetStat(virtualPath string, attributes *StatAttributes) error {
+func (c *BaseConnection) SetStat(virtualPath string, attributes *StatAttributes) (retErr error) {
+	defer func() {
+		retErr = FirstError(c.RecoverPanic(recover()), retErr)
+	}()
+
 	fs, fsPath, err := c.GetFsAndResolvedPath(virtualPath)
 	if err != nil {
 		return err
@@ -1109,4 +1146,23 @@ func (c *BaseConnection) GetFsAndResolvedPath(virtualPath string) (vfs.Fs, strin
 	}
 
 	return fs, fsPath, nil
+}
+
+func (c *BaseConnection) RecoverPanic(err interface{}) error {
+	if err != nil {
+		c.Log(logger.LevelError, "panic: %v\n\n%s", err, debug.Stack())
+		return c.GetGenericError(errors.New(""))
+	}
+	return nil
+}
+
+// FirstError returns the first non-nil argument.
+func FirstError(ers ...error) error {
+	for _, e := range ers {
+		if e != nil {
+			return e
+		}
+	}
+
+	return nil
 }

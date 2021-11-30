@@ -458,7 +458,7 @@ func (fs CliFs) call(name string, args ...string) ([]byte, error) {
 		if s := getErrorFromStatus(stdErrBuf.Bytes()); s != nil {
 			return nil, s
 		}
-		return nil, errors.Wrap(erRun, "failed to run command: " + fs.config.BinPath + " " + strings.Join(a, " "))
+		return nil, errors.Wrap(erRun, "failed to run command: "+fs.config.BinPath+" "+strings.Join(a, " "))
 	}
 
 	return stdoutBuf.Bytes(), nil
