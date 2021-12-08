@@ -269,7 +269,11 @@ func (c *Connection) ReadDir(name string) ([]os.FileInfo, error) {
 }
 
 // GetHandle implements ClientDriverExtentionFileTransfer
-func (c *Connection) GetHandle(name string, flags int, offset int64) (ftpserver.FileTransfer, error) {
+func (c *Connection) GetHandle(name string, flags int, offset int64) (ft ftpserver.FileTransfer, retErr error) {
+	defer func() {
+		retErr = common.FirstError(c.BaseConnection.RecoverPanic(recover()), retErr)
+	}()
+
 	c.UpdateLastActivity()
 
 	fs, p, err := c.GetFsAndResolvedPath(name)

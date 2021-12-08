@@ -45,7 +45,11 @@ func (c *Connection) GetCommand() string {
 }
 
 // Fileread creates a reader for a file on the system and returns the reader back.
-func (c *Connection) Fileread(request *sftp.Request) (io.ReaderAt, error) {
+func (c *Connection) Fileread(request *sftp.Request) (ra io.ReaderAt, retErr error) {
+	defer func() {
+		retErr = common.FirstError(c.BaseConnection.RecoverPanic(recover()), retErr)
+	}()
+
 	c.UpdateLastActivity()
 
 	if !c.User.HasPerm(dataprovider.PermDownload, path.Dir(request.Filepath)) {
@@ -90,7 +94,11 @@ func (c *Connection) Filewrite(request *sftp.Request) (io.WriterAt, error) {
 	return c.handleFilewrite(request)
 }
 
-func (c *Connection) handleFilewrite(request *sftp.Request) (sftp.WriterAtReaderAt, error) {
+func (c *Connection) handleFilewrite(request *sftp.Request) (fa sftp.WriterAtReaderAt, retErr error) {
+	defer func() {
+		retErr = common.FirstError(c.BaseConnection.RecoverPanic(recover()), retErr)
+	}()
+
 	c.UpdateLastActivity()
 
 	if !c.User.IsFileAllowed(request.Filepath) {
@@ -183,7 +191,11 @@ func (c *Connection) Filecmd(request *sftp.Request) error {
 
 // Filelist is the handler for SFTP filesystem list calls. This will handle calls to list the contents of
 // a directory as well as perform file/folder stat calls.
-func (c *Connection) Filelist(request *sftp.Request) (sftp.ListerAt, error) {
+func (c *Connection) Filelist(request *sftp.Request) (la sftp.ListerAt, retErr error) {
+	defer func() {
+		retErr = common.FirstError(c.RecoverPanic(recover()), retErr)
+	}()
+
 	c.UpdateLastActivity()
 
 	switch request.Method {
